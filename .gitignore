@@ -10,6 +10,6 @@ local_model/
 *.jsonl
 *.jsonl.gz
 submission.csv
-
+*.json
 # Keep sample submission as reference
 !sample_submission.csv
