@@ -35,20 +35,54 @@ def is_honeypot(candidate):
     if (yoe * 12) > (total_career_months + 60): # allow 5 years missing from history
         return True
         
-    # Check 4: Education vs Experience paradox
+    # Check 4: Education vs Experience paradox and Education Timeline Weirdness
     education = candidate.get("education", [])
     if education:
         earliest_start = min((edu.get("start_year", CURRENT_YEAR) for edu in education), default=CURRENT_YEAR)
+        max_end = max((edu.get("end_year", 0) for edu in education), default=0)
+        
         # Assuming typical college start is 18, so candidate age is roughly (CURRENT_YEAR - earliest_start) + 18
         # If experience > age - 15 (started working at 15) -> impossible
         estimated_age = (CURRENT_YEAR - earliest_start) + 18
         if yoe > (estimated_age - 15):
             return True
+
+        # Education Weirdness: Bachelors after Masters
+        # We can loosely check if a lower degree starts after a higher degree ends
+        bachelors_start = 2050
+        masters_start = 0
+        for edu in education:
+            deg = edu.get("degree", "").lower()
+            if deg in ["b.e.", "b.tech", "b.sc", "bachelors"]:
+                bachelors_start = min(bachelors_start, edu.get("start_year", 2050))
+            if deg in ["m.e.", "m.tech", "m.sc", "masters"]:
+                masters_start = max(masters_start, edu.get("start_year", 0))
+
+        if masters_start > 0 and bachelors_start != 2050:
+            if masters_start < bachelors_start:
+                return True # Started Masters before Bachelors!
+
+        # Massive Gap: If they finished education 10+ years before their first job but have low YoE
+        if career_history and max_end > 0:
+            first_job_start = 2050
+            for job in career_history:
+                st = job.get("start_date")
+                if st:
+                    try:
+                        yr = int(st.split("-")[0])
+                        first_job_start = min(first_job_start, yr)
+                    except:
+                        pass
+            
+            if first_job_start != 2050:
+                gap = first_job_start - max_end
+                if gap > 10 and yoe < 6:
+                    # e.g., graduated 2009, started working 2022 (gap 13), but only 4.2 YoE
+                    return True
             
     # Check 5: Overlapping dates producing excessive duration
     # Simple check: max end date - min start date across career history
     # If this chronological span is much smaller than sum of durations, they are claiming multiple full-time roles simultaneously
-    # We will skip complex date parsing for speed if not strictly necessary, but let's do a basic check.
     if career_history:
         try:
             min_date = None
@@ -77,5 +111,21 @@ def is_honeypot(candidate):
         except ValueError:
             pass # ignore date parse errors
             
+    # Check 6: "Time-Traveling Tech Liars" (Honeypot keyword stuffers)
+    # E.g. claiming 80 months of QLoRA (released 2023) or LangChain (released late 2022)
+    # Assuming current year is ~2026, max possible duration is ~36-48 months
+    for s in skills:
+        name = s.get("name", "").lower()
+        dur = s.get("duration_months", 0)
+        if name == "qlora" and dur > 36:
+            return True
+        if name == "langchain" and dur > 48:
+            return True
+        if name == "chatgpt" and dur > 44:
+            return True
+        if name == "llama-2" and dur > 36:
+            return True
+
     return False
+
 

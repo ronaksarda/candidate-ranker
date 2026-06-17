@@ -59,8 +59,21 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     else:
         parts.append(f"longer {notice}-day notice period")
 
-    # Response rate
-    if resp_rate > 0.7:
+    # Location fit
+    loc = profile.get("location", "").lower()
+    will_relocate = signals.get("willing_to_relocate", False)
+    if "bangalore" in loc or "bengaluru" in loc:
+        parts.append("Bangalore-based")
+    elif will_relocate:
+        parts.append("willing to relocate to Bangalore")
+    else:
+        parts.append("location mismatch (requires relocation but unwilling)")
+
+    # Response rate and Open to Work
+    open_to_work = signals.get("open_to_work_flag", True)
+    if not open_to_work:
+        parts.append("NOT currently open to work")
+    elif resp_rate > 0.7:
         parts.append("high recruiter responsiveness")
     elif resp_rate < 0.3:
         parts.append(f"low historical response rate ({int(resp_rate*100)}%)")

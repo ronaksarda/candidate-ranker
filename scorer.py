@@ -149,12 +149,16 @@ def calculate_signal_score(candidate):
 
     loc = profile.get("location", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    if any(city in loc for city in ["pune", "noida", "delhi", "mumbai"]) or will_relocate:
+    if "bangalore" in loc or "bengaluru" in loc or will_relocate:
         score += 0.17
 
     gh_score = signals.get("github_activity_score", -1)
     if gh_score > 50:
         score += 0.17
+
+    # If not open to work, massive penalty to signals
+    if not signals.get("open_to_work_flag", True):
+        score *= 0.1
 
     return min(1.0, score)
 
