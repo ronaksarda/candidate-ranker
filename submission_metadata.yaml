@@ -1,0 +1,80 @@
+# Redrob Hackathon — Submission Metadata
+# Team Clover
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "Team Clover"
+
+primary_contact:
+  name: "ronak sarda"
+  email: "rockysarda18@gmail.com"
+  phone: "+91-9390417137"
+
+team_members:
+  - name: "Ronak sarda"
+    email: "rockysarda18@gmail.com"
+    role: "Team Lead / solo member"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/ronaksarda/candidate-ranker"
+
+sandbox_link: "https://colab.research.google.com/drive/1nwazrKsOeoN1rb6XW9OTgTXwv2JiC94f?usp=sharing"
+
+reproduce_command: "python main.py --candidates ./candidates.jsonl --out ./submission.csv"
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "Windows PC"
+  cpu_cores: 8
+  ram_gb: 16
+  python_version: "3.11"
+  os: "Windows 11"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: true
+  pre_computation_time_minutes: 2
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Gemini (Antigravity IDE)"
+
+ai_usage_summary: |
+  Used Gemini via Antigravity IDE for architecture discussion, code scaffolding,
+  and debugging. No candidate data was fed to any LLM during ranking.
+  The ranking pipeline runs fully offline using a local sentence-transformers model.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  Semantic embedding ranker with behavioral signal fusion. Candidates are
+  streamed from JSONL via generator, passed through a 5-check honeypot
+  plausibility filter, then a fast heuristic keyword pre-filter eliminates
+  ~90% of non-technical profiles before the expensive AI step. Remaining
+  candidates are batch-encoded using all-MiniLM-L6-v2 (loaded offline),
+  compared against 3 weighted JD facets (core ML 45%, infra 45%,
+  nice-to-haves 10%) via normalized dot product. The final score fuses 
+  50% semantic AI, 30% explicit JD skill match (to filter non-tech roles),
+  and 20% behavioral signal score (activity recency, response rate,
+  interview completion, notice period, location, GitHub activity).
+  Dead profiles (180+ days inactive or <10% response) are halved.
+  Top 100 candidates receive dynamically generated reasoning grounded
+  in their actual top skills and specific signal gaps.
+  Runtime: <5 minutes on CPU, 16GB RAM, zero network calls.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true

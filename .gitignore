@@ -1,0 +1,15 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local AI Models (do not commit 100MB+ weights)
+local_model/
+
+# Input / Output Data
+*.jsonl
+*.jsonl.gz
+submission.csv
+
+# Keep sample submission as reference
+!sample_submission.csv
