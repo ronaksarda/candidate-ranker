@@ -149,7 +149,7 @@ def calculate_signal_score(candidate):
 
     loc = profile.get("location", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    if "bangalore" in loc or "bengaluru" in loc or will_relocate:
+    if any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"]) or will_relocate:
         score += 0.17
 
     gh_score = signals.get("github_activity_score", -1)

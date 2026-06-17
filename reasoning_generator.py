@@ -62,10 +62,10 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     # Location fit
     loc = profile.get("location", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    if "bangalore" in loc or "bengaluru" in loc:
-        parts.append("Bangalore-based")
+    if any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"]):
+        parts.append("Pune/Noida-compatible location")
     elif will_relocate:
-        parts.append("willing to relocate to Bangalore")
+        parts.append("willing to relocate to Pune/Noida")
     else:
         parts.append("location mismatch (requires relocation but unwilling)")
 
