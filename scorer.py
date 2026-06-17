@@ -8,8 +8,7 @@ STRONG_TITLE_MATCHES = {
     "machine learning", "ml engineer", "ml ", "deep learning", "nlp",
     "natural language", "ai engineer", "ai research", "search engineer",
     "ranking engineer", "recommendation", "data scientist", "applied ml",
-    "computer vision", "cv engineer", "research engineer", "research scientist",
-    "applied scientist",
+    "research engineer", "research scientist", "applied scientist",
 }
 
 WEAK_TITLE_MATCHES = {
@@ -23,6 +22,7 @@ IRRELEVANT_TITLES = {
     "civil", "mechanical", "electrical engineer", "procurement",
     "legal", "compliance", "admin", "office manager", "receptionist",
     "content writer", "graphic design", "ui/ux", "teacher", "professor",
+    "computer vision", "cv engineer", "robotics", "speech", "vision"
 }
 
 # ============================================================================
@@ -149,8 +149,11 @@ def calculate_signal_score(candidate):
 
     loc = profile.get("location", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    if any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"]) or will_relocate:
+    is_compatible = any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"])
+    if is_compatible or will_relocate:
         score += 0.17
+    else:
+        score *= 0.1 # Disqualifying penalty
 
     gh_score = signals.get("github_activity_score", -1)
     if gh_score > 50:

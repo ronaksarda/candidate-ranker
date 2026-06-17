@@ -126,6 +126,34 @@ def is_honeypot(candidate):
         if name == "llama-2" and dur > 36:
             return True
 
+    # Check 7: Skills Without Evidence Trap
+    # If they claim advanced/expert in vector DBs but never mention them in career history
+    career_text = " ".join([job.get("description", "").lower() for job in career_history])
+    summary_text = profile.get("summary", "").lower()
+    full_text = career_text + " " + summary_text
+    
+    vector_dbs = {"qdrant", "milvus", "pinecone", "weaviate", "faiss", "semantic search"}
+    claimed_vector_dbs = [s.get("name", "").lower() for s in skills if s.get("name", "").lower() in vector_dbs]
+    
+    # If they claim multiple vector DBs in skills, but have ZERO mentions of any vector DBs in career_history
+    if len(claimed_vector_dbs) >= 2:
+        evidence_found = False
+        for db in vector_dbs:
+            if db in career_text:
+                evidence_found = True
+                break
+        if not evidence_found:
+            return True # Keyword stuffer trap!
+
+    # Check 8: Computer Vision Disqualifier
+    # JD explicitly rejects primary CV without NLP/IR. If they admit limited NLP experience or transitioning to NLP.
+    if "professional experience there is limited" in full_text and "transitioning toward nlp" in full_text:
+        return True
+    
+    # If they explicitly state their primary expertise is CV
+    if "most of my project work has been in cv" in full_text:
+        return True
+
     return False
 
 
