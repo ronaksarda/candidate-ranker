@@ -1,6 +1,27 @@
 import datetime
+import difflib
 
 CURRENT_YEAR = 2026
+
+def has_duplicate_descriptions(candidate):
+    """
+    Returns True if the candidate has highly similar (>0.9 ratio) descriptions
+    across multiple distinct roles in their career history.
+    """
+    career_history = candidate.get("career_history", [])
+    if len(career_history) < 2:
+        return False
+        
+    descriptions = [job.get("description", "").strip() for job in career_history]
+    valid_descriptions = [d for d in descriptions if len(d) > 40]
+    
+    for i in range(len(valid_descriptions)):
+        for j in range(i + 1, len(valid_descriptions)):
+            ratio = difflib.SequenceMatcher(None, valid_descriptions[i].lower(), valid_descriptions[j].lower()).ratio()
+            if ratio > 0.9:
+                return True
+                
+    return False
 
 def is_honeypot(candidate):
     """
@@ -155,5 +176,6 @@ def is_honeypot(candidate):
         return True
 
     return False
+
 
 

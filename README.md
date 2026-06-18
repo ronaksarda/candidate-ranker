@@ -12,6 +12,9 @@ Our ranking pipeline leverages a custom-built, offline-first execution strategy 
 4. **Dynamic Score Fusion**: The final composite score fuses 50% AI semantic match, 30% explicit JD skill match (to penalize buzzword stuffing), and 20% Redrob behavioral signals (response rate, GitHub activity, notice period).
 5. **Reasoning Generation**: Generates 2-sentence rationale based on specific data points (extracted skills, exact notice periods).
 
+## Known Dataset-Quality Edge Cases
+During analysis, we identified occasional dataset generation artifacts (e.g., identical, lengthy job descriptions copy-pasted across multiple distinct roles in a candidate's career history). Rather than allowing these unverified clones to pollute the ranking, our `plausibility_filter.py` explicitly traps and disqualifies candidates exhibiting this "duplicate-description" anomaly. This ensures the integrity of the top candidate pool.
+
 ## Setup & Reproduction
 
 We strictly enforce offline network execution to comply with Stage 3 rules via `TRANSFORMERS_OFFLINE` environment variables embedded in the code.

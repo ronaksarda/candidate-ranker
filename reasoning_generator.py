@@ -1,3 +1,5 @@
+from plausibility_filter import has_duplicate_descriptions
+
 def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     """
     Generates a concise, specific, and accurate 2-sentence rationale.
@@ -43,8 +45,24 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     # Sentence 2: Specific, data-driven justification
     parts = []
 
-    # Semantic fit
-    if semantic_score > 0.65:
+    # JD Specific Priorities extraction (Fix 4)
+    career_text = " ".join([job.get("description", "") for job in candidate.get("career_history", [])]).lower()
+    summary_text = profile.get("summary", "").lower()
+    full_text = career_text + " " + summary_text
+
+    has_eval = any(kw in full_text for kw in ["ndcg", "mrr", "a/b test", "evaluation framework", "eval framework", "recall@"])
+    has_prod = any(kw in full_text for kw in ["production deployment", "shipped", "serving", "peak qps", "rolled out", "in production"])
+    has_lead = any(kw in full_text for kw in ["mentored", "lead", "scaling", "managed", "drove the migration", "led a team"])
+
+    specifics = []
+    if has_eval: specifics.append("evaluation framework experience")
+    if has_prod: specifics.append("production deployment evidence")
+    if has_lead: specifics.append("mentorship readiness")
+
+    # Semantic fit with specific JD criteria
+    if specifics:
+        parts.append(f"alignment showcasing {', '.join(specifics)}")
+    elif semantic_score > 0.65:
         parts.append("strong semantic alignment with the JD's core ML and retrieval requirements")
     elif semantic_score > 0.5:
         parts.append("solid semantic overlap with the JD's technical requirements")
@@ -61,13 +79,18 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
 
     # Location fit
     loc = profile.get("location", "").lower()
+    country = profile.get("country", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    if any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"]):
-        parts.append("Pune/Noida-compatible location")
+    is_compatible = any(city in loc for city in ["pune", "noida", "delhi", "ncr", "mumbai", "hyderabad"])
+    
+    if is_compatible:
+        parts.append("location compatible")
     elif will_relocate:
-        parts.append("willing to relocate to Pune/Noida")
+        parts.append("willing to relocate to target cities")
+    elif country and country != "india":
+        parts.append("international location mismatch (requires visa/relocation from outside India)")
     else:
-        parts.append("location mismatch (requires relocation but unwilling)")
+        parts.append("domestic location mismatch (requires relocation but unwilling)")
 
     # Response rate and Open to Work
     open_to_work = signals.get("open_to_work_flag", True)
@@ -85,4 +108,8 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     sentence2 = "; ".join(parts) + "."
     sentence2 = sentence2[0].upper() + sentence2[1:]
 
-    return f"{sentence1} {sentence2}"
+    final_reasoning = f"{sentence1} {sentence2}"
+    if has_duplicate_descriptions(candidate):
+        final_reasoning += " [DATA CONSISTENCY FLAG: Duplicate roles]"
+
+    return final_reasoning

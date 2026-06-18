@@ -15,10 +15,10 @@ def load_candidates_stream(filepath):
                         candidate = json.loads(line)
                         yield candidate
                     except json.JSONDecodeError as e:
-                        logger.error({"error": str(e)}, 'Failed to decode line in candidates.jsonl')
+                        logger.error('Failed to decode line in candidates.jsonl', extra={"error": str(e)})
                         continue
     except FileNotFoundError:
-        logger.error({"filepath": filepath}, 'candidates.jsonl not found')
+        logger.error('candidates.jsonl not found', extra={"filepath": filepath})
         raise
 
 if __name__ == "__main__":

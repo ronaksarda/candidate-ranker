@@ -1,5 +1,5 @@
 import datetime
-from plausibility_filter import is_honeypot
+from plausibility_filter import is_honeypot, has_duplicate_descriptions
 
 # ============================================================================
 # Title relevance — hard gate against irrelevant job titles
@@ -70,6 +70,37 @@ def calculate_title_multiplier(candidate):
             return 0.70
 
     return 0.45
+
+
+SERVICES_FIRMS = {
+    "tcs", "tata consultancy services", "infosys", "wipro", "cognizant",
+    "accenture", "capgemini", "hcl", "tech mahindra", "ibm", "l&t infotech",
+    "lti", "mindtree", "mphasis", "syntel", "genpact", "genpact ai"
+}
+
+def calculate_services_penalty(candidate):
+    """
+    Returns a significant penalty (0.4) if the candidate's ENTIRE career
+    history is at pure IT-services/staffing firms.
+    """
+    career_history = candidate.get("career_history", [])
+    if not career_history:
+        return 1.0
+    
+    for job in career_history:
+        company = job.get("company", "").lower()
+        is_service = False
+        for firm in SERVICES_FIRMS:
+            if firm in company:
+                is_service = True
+                break
+        
+        # If they have even one job not at a services firm, they are safe
+        if not is_service:
+            return 1.0
+            
+    # If we get here, EVERY job was at a services firm
+    return 0.4
 
 
 def calculate_skill_match_score(candidate):
@@ -148,12 +179,12 @@ def calculate_signal_score(candidate):
         score += 0.16
 
     loc = profile.get("location", "").lower()
+    country = profile.get("country", "").lower()
     will_relocate = signals.get("willing_to_relocate", False)
-    is_compatible = any(city in loc for city in ["pune", "noida", "delhi", "mumbai", "hyderabad"])
+    is_compatible = any(city in loc for city in ["pune", "noida", "delhi", "ncr", "mumbai", "hyderabad"])
+    
     if is_compatible or will_relocate:
         score += 0.17
-    else:
-        score *= 0.1 # Disqualifying penalty
 
     gh_score = signals.get("github_activity_score", -1)
     if gh_score > 50:
@@ -187,6 +218,28 @@ def score_candidate(candidate, semantic_score):
 
     # Title gate
     final_score = raw_score * title_mult
+
+    # Services-only penalty (Fix 1)
+    services_mult = calculate_services_penalty(candidate)
+    final_score *= services_mult
+
+    # Duplicate descriptions soft-penalty (Fix 2)
+    if has_duplicate_descriptions(candidate):
+        final_score *= 0.5
+        
+    # Location penalty (Fix 3)
+    profile = candidate.get("profile", {})
+    signals = candidate.get("redrob_signals", {})
+    loc = profile.get("location", "").lower()
+    country = profile.get("country", "").lower()
+    will_relocate = signals.get("willing_to_relocate", False)
+    is_compatible = any(city in loc for city in ["pune", "noida", "delhi", "ncr", "mumbai", "hyderabad"])
+    
+    if not is_compatible and not will_relocate:
+        if country and country != "india":
+            final_score *= 0.05 # heavier penalty for international visa requirements
+        else:
+            final_score *= 0.1 # Disqualifying penalty
 
     # Heavy penalty for dead profiles
     signals = candidate.get("redrob_signals", {})
