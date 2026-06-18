@@ -23,7 +23,7 @@ github_repo: "https://github.com/ronaksarda/candidate-ranker"
 
 sandbox_link: "https://colab.research.google.com/drive/1nwazrKsOeoN1rb6XW9OTgTXwv2JiC94f?usp=sharing"
 
-reproduce_command: "python main.py --candidates ./candidates.jsonl --out ./submission.csv"
+reproduce_command: "python main.py --candidates ./candidates.jsonl --out ./team_TeamClover.csv"
 
 # ============================================================================
 # Compute environment

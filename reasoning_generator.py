@@ -1,4 +1,4 @@
-from plausibility_filter import has_duplicate_descriptions
+# Imports removed
 
 def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     """
@@ -109,7 +109,6 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     sentence2 = sentence2[0].upper() + sentence2[1:]
 
     final_reasoning = f"{sentence1} {sentence2}"
-    if has_duplicate_descriptions(candidate):
-        final_reasoning += " [DATA CONSISTENCY FLAG: Duplicate roles]"
+    # Duplicate roles warning removed as they are now fully disqualified.
 
     return final_reasoning

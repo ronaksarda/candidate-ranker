@@ -46,7 +46,7 @@ def cheap_keyword_score(text_lower):
 def main():
     parser = argparse.ArgumentParser(description="Redrob AI Candidate Ranking System")
     parser.add_argument("--candidates", type=str, default="candidates.jsonl", help="Path to candidates.jsonl")
-    parser.add_argument("--out", type=str, default="submission.csv", help="Output CSV path")
+    parser.add_argument("--out", type=str, default="team_TeamClover.csv", help="Output CSV path")
     args = parser.parse_args()
 
     start_time = time.time()

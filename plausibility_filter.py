@@ -5,23 +5,19 @@ CURRENT_YEAR = 2026
 
 def has_duplicate_descriptions(candidate):
     """
-    Returns True if the candidate has highly similar (>0.9 ratio) descriptions
+    Returns True if the candidate has identical descriptions
     across multiple distinct roles in their career history.
+    Optimized for O(N) speed across 100k candidates.
     """
     career_history = candidate.get("career_history", [])
     if len(career_history) < 2:
         return False
         
-    descriptions = [job.get("description", "").strip() for job in career_history]
+    descriptions = [job.get("description", "").strip().lower() for job in career_history]
     valid_descriptions = [d for d in descriptions if len(d) > 40]
     
-    for i in range(len(valid_descriptions)):
-        for j in range(i + 1, len(valid_descriptions)):
-            ratio = difflib.SequenceMatcher(None, valid_descriptions[i].lower(), valid_descriptions[j].lower()).ratio()
-            if ratio > 0.9:
-                return True
-                
-    return False
+    # Exact match check is instantaneous via set hashing
+    return len(set(valid_descriptions)) < len(valid_descriptions)
 
 def is_honeypot(candidate):
     """
@@ -30,6 +26,9 @@ def is_honeypot(candidate):
     profile = candidate.get("profile", {})
     yoe = profile.get("years_of_experience", 0)
     
+    if has_duplicate_descriptions(candidate):
+        return True
+
     # Check 1: Expert proficiency in many skills with 0 months duration
     skills = candidate.get("skills", [])
     expert_zero_months = 0
@@ -68,20 +67,29 @@ def is_honeypot(candidate):
         if yoe > (estimated_age - 15):
             return True
 
-        # Education Weirdness: Bachelors after Masters
+        # Education Weirdness: Bachelors after Masters or PhD before Bachelors/Masters
         # We can loosely check if a lower degree starts after a higher degree ends
         bachelors_start = 2050
         masters_start = 0
+        phd_start = 0
         for edu in education:
             deg = edu.get("degree", "").lower()
-            if deg in ["b.e.", "b.tech", "b.sc", "bachelors"]:
+            if deg in ["b.e.", "b.tech", "b.sc", "bachelors", "b.s.", "bs", "b.a."]:
                 bachelors_start = min(bachelors_start, edu.get("start_year", 2050))
-            if deg in ["m.e.", "m.tech", "m.sc", "masters"]:
+            if deg in ["m.e.", "m.tech", "m.sc", "masters", "m.s.", "ms", "m.a."]:
                 masters_start = max(masters_start, edu.get("start_year", 0))
+            if deg in ["ph.d", "ph.d.", "phd", "doctorate"]:
+                phd_start = max(phd_start, edu.get("start_year", 0))
 
         if masters_start > 0 and bachelors_start != 2050:
             if masters_start < bachelors_start:
                 return True # Started Masters before Bachelors!
+                
+        if phd_start > 0:
+            if bachelors_start != 2050 and phd_start < bachelors_start:
+                return True # Started PhD before Bachelors!
+            if masters_start > 0 and phd_start < masters_start:
+                return True # Started PhD before Masters!
 
         # Massive Gap: If they finished education 10+ years before their first job but have low YoE
         if career_history and max_end > 0:
@@ -173,6 +181,27 @@ def is_honeypot(candidate):
     
     # If they explicitly state their primary expertise is CV
     if "most of my project work has been in cv" in full_text:
+        return True
+
+    # Check 9: False claims / Wrong persona (High proficiency but terrible assessment score)
+    skill_assessments = candidate.get("redrob_signals", {}).get("skill_assessment_scores", {})
+    for s in skills:
+        name = s.get("name")
+        prof = s.get("proficiency", "beginner")
+        if name in skill_assessments:
+            score = skill_assessments[name]
+            if prof == "expert" and score < 40:
+                return True
+            if prof == "advanced" and score < 25:
+                return True
+
+    # Check 10: Wrong persona - says "enthusiast" or "aspiring" but claims > 3 years of experience
+    headline = profile.get("headline", "").lower()
+    if ("enthusiast" in headline or "aspiring" in headline) and yoe > 3:
+        return True
+        
+    # Check 11: Backend/Data engineer transitioning, claims wrong persona for senior ML role
+    if "interested in transitioning toward" in full_text and "learning modern ml practice" in full_text:
         return True
 
     return False

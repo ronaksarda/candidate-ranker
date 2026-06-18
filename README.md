@@ -33,15 +33,15 @@ python download_model.py
 ```
 
 ### 3. Run the Ranking Pipeline (Offline)
-To reproduce our top 100 ranking and generate the final `submission.csv` output within the 5-minute offline window:
+To reproduce our top 100 ranking and generate the final `team_TeamClover.csv` output within the 5-minute offline window:
 
 ```bash
-python main.py --candidates ./candidates.jsonl --out ./submission.csv
+python main.py --candidates ./candidates.jsonl --out ./team_TeamClover.csv
 ```
 
 ### 4. Validate
 ```bash
-python validate_submission.py submission.csv
+python validate_submission.py team_TeamClover.csv
 ```
 
 ## Repository Structure

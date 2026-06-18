@@ -1,5 +1,9 @@
 import datetime
-from plausibility_filter import is_honeypot, has_duplicate_descriptions
+import re
+from plausibility_filter import is_honeypot
+
+def is_valid_match(s1, s2):
+    return (s1 == s2) or bool(re.search(r'\b' + re.escape(s1) + r'\b', s2)) or bool(re.search(r'\b' + re.escape(s2) + r'\b', s1))
 
 # ============================================================================
 # Title relevance — hard gate against irrelevant job titles
@@ -91,7 +95,7 @@ def calculate_services_penalty(candidate):
         company = job.get("company", "").lower()
         is_service = False
         for firm in SERVICES_FIRMS:
-            if firm in company:
+            if re.search(r'\b' + re.escape(firm) + r'\b', company):
                 is_service = True
                 break
         
@@ -126,28 +130,46 @@ def calculate_skill_match_score(candidate):
 
     for sname in skill_names:
         for jd_skill in JD_CORE_SKILLS:
-            if jd_skill in sname or sname in jd_skill:
+            if is_valid_match(jd_skill, sname):
                 core_hits += 1
                 break
         for jd_skill in JD_STRONG_SKILLS:
-            if jd_skill in sname or sname in jd_skill:
+            if is_valid_match(jd_skill, sname):
                 strong_hits += 1
                 break
         for jd_skill in JD_NICE_SKILLS:
-            if jd_skill in sname or sname in jd_skill:
+            if is_valid_match(jd_skill, sname):
                 nice_hits += 1
                 break
 
     # Also check career descriptions for core skill evidence
     for jd_skill in JD_CORE_SKILLS:
-        if jd_skill in career_text:
+        if is_valid_match(jd_skill, career_text):
             core_hits += 0.5
 
     core_score = min(1.0, core_hits / 3)
     strong_score = min(1.0, strong_hits / 3)
     nice_score = min(1.0, nice_hits / 2)
 
-    return (core_score * 0.50) + (strong_score * 0.35) + (nice_score * 0.15)
+    base_score = (core_score * 0.50) + (strong_score * 0.35) + (nice_score * 0.15)
+    
+    # Skill index bonus based on assessment scores for relevant skills
+    skill_assessments = candidate.get("redrob_signals", {}).get("skill_assessment_scores", {})
+    assessment_bonus = 0.0
+    for sname, sscore in skill_assessments.items():
+        sname_lower = sname.lower()
+        is_relevant = False
+        for jd_skill in JD_CORE_SKILLS | JD_STRONG_SKILLS:
+            if is_valid_match(jd_skill, sname_lower):
+                is_relevant = True
+                break
+        if is_relevant:
+            if sscore > 85:
+                assessment_bonus += 0.1
+            elif sscore > 70:
+                assessment_bonus += 0.05
+                
+    return min(1.0, base_score + min(0.2, assessment_bonus))
 
 
 def calculate_signal_score(candidate):
@@ -173,6 +195,12 @@ def calculate_signal_score(candidate):
 
     if interview_rate > 0.8:
         score += 0.17
+
+    offer_acceptance = signals.get("offer_acceptance_rate", -1)
+    if offer_acceptance > 0.7:
+        score += 0.15
+    elif 0 <= offer_acceptance < 0.3:
+        score -= 0.20
 
     notice_days = signals.get("notice_period_days", 90)
     if notice_days <= 30:
@@ -223,10 +251,6 @@ def score_candidate(candidate, semantic_score):
     services_mult = calculate_services_penalty(candidate)
     final_score *= services_mult
 
-    # Duplicate descriptions soft-penalty (Fix 2)
-    if has_duplicate_descriptions(candidate):
-        final_score *= 0.5
-        
     # Location penalty (Fix 3)
     profile = candidate.get("profile", {})
     signals = candidate.get("redrob_signals", {})

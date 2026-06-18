@@ -12,7 +12,7 @@ class EmbeddingEngine:
                 # Fallback: download from HuggingFace (for Colab / first run)
                 model_path = "all-MiniLM-L6-v2"
             
-        self.model = SentenceTransformer(model_path)
+        self.model = SentenceTransformer(model_path, device='cpu')
         
         # Define JD Facets text
         self.facets_text = {
