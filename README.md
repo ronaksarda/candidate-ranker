@@ -6,11 +6,11 @@ This repository contains the complete offline implementation of an AI Candidate 
 
 Our ranking pipeline leverages a custom-built, offline-first execution strategy to accurately rank 100,000 synthetic candidates within strict compute constraints (5 minutes, CPU-only, 16GB RAM). 
 
-1. **Plausibility Filter**: We aggressively filter out honeypot candidates (e.g. 5 expert skills with 0 months duration, overlapping timelines creating impossible durations).
-2. **Fast Pre-filter**: A deterministic keyword heuristic rapidly downsizes the candidate pool from 100k to the top 3,000, eliminating non-technical candidates (e.g. HR, Sales).
-3. **AI Semantic Embedding**: We embed the remaining 3,000 candidates using a locally-hosted `all-MiniLM-L6-v2` model against three distinct vectors derived directly from the official Job Description (Core ML, Infra, Nice-to-Haves).
-4. **Dynamic Score Fusion**: The final composite score fuses 50% AI semantic match, 30% explicit JD skill match (to penalize buzzword stuffing), and 20% Redrob behavioral signals (response rate, GitHub activity, notice period).
-5. **Reasoning Generation**: Generates 2-sentence rationale based on specific data points (extracted skills, exact notice periods).
+1. **Plausibility Filter**: We aggressively filter out honeypot candidates via 12 checks (expert skills with 0 months duration, overlapping timelines, time-traveling tech claims, education paradoxes, duplicate career descriptions, LangChain-only wrappers, wrong persona).
+2. **Fast Pre-filter**: A deterministic keyword-weighted heuristic rapidly downsizes the candidate pool from 100k to the top 3,000, with a two-bucket strategy prioritizing core retrieval/ranking keywords while preserving recall.
+3. **AI Semantic Embedding**: The shortlisted 3,000 candidates are batch-encoded using a locally-hosted `all-MiniLM-L6-v2` model (via direct Transformers inference, not SentenceTransformer) against three distinct JD-derived facet vectors (Core ML, Engineering Infrastructure, Nice-to-Haves).
+4. **Dynamic Score Fusion**: Final composite score fuses semantic similarity (50%), explicit JD skill match (30%), and behavioral signals (20%), then applies multiplicative gates: seniority-aware title matching, 5-9 year experience band fit, services-only career penalty, tenure stability check, location compatibility, recency/responsiveness, profile completeness, and unverified vector-DB claim detection. Additive bonuses for tier-1/2 education and relevant certifications.
+5. **Reasoning Generation**: Each top-100 candidate receives an evidence-grounded rationale citing specific skills, career evidence, notice period, and behavioral signals.
 
 ## Known Dataset-Quality Edge Cases
 During analysis, we identified occasional dataset generation artifacts (e.g., identical, lengthy job descriptions copy-pasted across multiple distinct roles in a candidate's career history). Rather than allowing these unverified clones to pollute the ranking, our `plausibility_filter.py` explicitly traps and disqualifies candidates exhibiting this "duplicate-description" anomaly. This ensures the integrity of the top candidate pool.
@@ -46,7 +46,7 @@ python validate_submission.py team_TeamClover.csv
 
 ## Repository Structure
 * `main.py` - Primary orchestrator. Handles file IO and executes stages.
-* `scorer.py` - Fuses semantic scores with behavioral signals and handles weighting.
+* `scorer.py` - Multi-signal scoring: semantic similarity, skill matching, title/experience/location gates, behavioral signals, education/certification bonuses.
 * `embedding_engine.py` - Wrapper for the SentenceTransformer model and batch encoding.
 * `plausibility_filter.py` - Core logic for identifying impossible candidate timelines (Honeypot detection).
 * `reasoning_generator.py` - Dynamic text generator for candidate rationale.

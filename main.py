@@ -4,9 +4,8 @@ import time
 import argparse
 import csv
 from data_loader import load_candidates_stream
-from plausibility_filter import is_honeypot
+from plausibility_filter import is_honeypot, get_penalty_reasons
 from profile_builder import build_candidate_text
-from embedding_engine import EmbeddingEngine
 from scorer import score_candidate
 from reasoning_generator import generate_reasoning
 
@@ -28,14 +27,23 @@ JD_KEYWORDS = {
     "opensearch": 4, "elasticsearch": 3,
     "sentence-transformers": 5, "cosine similarity": 4,
     "python": 2, "aws": 1, "docker": 1, "mlops": 3,
-    "ndcg": 5, "mrr": 5, "map": 3,
+    "ndcg": 5, "mrr": 5, "map": 5,
+    "a/b test": 4, "evaluation framework": 4, "hybrid search": 4, "bge": 4,
 }
 
-SHORTLIST_SIZE = 3000
+CORE_KEYWORDS = [
+    "embedding", "vector", "faiss", "rag", "retrieval", "ndcg", "mrr", 
+    "transformer", "bert", "llm", "sentence-transformers", "pinecone", 
+    "weaviate", "qdrant", "milvus", "opensearch",
+    "nearest neighbour", "ann index", "approximate nearest", "dense retrieval",
+    "semantic search", "bi-encoder", "cross-encoder", "reranker", "nmslib", "scann"
+]
+
+SHORTLIST_SIZE = 3500
 
 
 def cheap_keyword_score(text_lower):
-    """Fast keyword-weighted score — no AI model involved."""
+    """Fast keyword-weighted score - no AI model involved."""
     score = 0
     for keyword, weight in JD_KEYWORDS.items():
         if keyword in text_lower:
@@ -47,9 +55,29 @@ def main():
     parser = argparse.ArgumentParser(description="Redrob AI Candidate Ranking System")
     parser.add_argument("--candidates", type=str, default="candidates.jsonl", help="Path to candidates.jsonl")
     parser.add_argument("--out", type=str, default="team_TeamClover.csv", help="Output CSV path")
+    parser.add_argument("--audit-honeypots", action="store_true", help="Audit honeypots and write to honeypot_audit.csv")
+    parser.add_argument("--debug-stage1", action="store_true", help="Write stage1_debug.csv")
     args = parser.parse_args()
 
     start_time = time.time()
+
+    if args.audit_honeypots:
+        print("Auditing honeypots...", flush=True)
+        from collections import Counter
+        reason_counts = Counter()
+        with open("honeypot_audit.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["candidate_id", "reason_code"])
+            for candidate in load_candidates_stream(args.candidates):
+                is_hp, reason = is_honeypot(candidate)
+                if is_hp:
+                    reason_counts[reason] += 1
+                    writer.writerow([candidate.get("candidate_id"), reason])
+
+        print("Honeypot Audit Results:", flush=True)
+        for reason, count in reason_counts.most_common():
+            print(f"  {reason}: {count}")
+        return
 
     # ---- Stage 1: Cheap keyword scan on ALL 100k candidates ----
     print("Stage 1: Fast keyword scan on all candidates...", flush=True)
@@ -62,7 +90,8 @@ def main():
         if total % 20000 == 0:
             print(f"  ... scanned {total}", flush=True)
 
-        if is_honeypot(candidate):
+        is_hp, reason = is_honeypot(candidate)
+        if is_hp:
             honeypots += 1
             continue
 
@@ -71,12 +100,47 @@ def main():
         kscore = cheap_keyword_score(text_lower)
 
         if kscore > 0:
-            shortlist.append((kscore, candidate, text_profile[:256]))
+            has_core = any(ck in text_lower for ck in CORE_KEYWORDS)
+            shortlist.append((kscore, candidate, text_profile[:1200], has_core))
 
     print(f"Stage 1 done: {total} scanned, {honeypots} honeypots, {len(shortlist)} have ML keywords", flush=True)
 
     shortlist.sort(key=lambda x: x[0], reverse=True)
-    shortlist = shortlist[:SHORTLIST_SIZE]
+
+    # Two-bucket shortlist
+    bucket_1_size = int(SHORTLIST_SIZE * 0.8)
+    bucket_1 = shortlist[:bucket_1_size]
+
+    bucket_2_size = SHORTLIST_SIZE - bucket_1_size
+    bucket_2 = []
+    bucket_2_ids = set()
+
+    for item in shortlist[bucket_1_size:]:
+        if item[3]:
+            bucket_2.append(item)
+            bucket_2_ids.add(item[1]["candidate_id"])
+            if len(bucket_2) == bucket_2_size:
+                break
+
+    if len(bucket_2) < bucket_2_size:
+        needed = bucket_2_size - len(bucket_2)
+        remaining_bucket = [
+            x for x in shortlist[bucket_1_size:]
+            if x[1]["candidate_id"] not in bucket_2_ids
+        ]
+        bucket_2.extend(remaining_bucket[:needed])
+
+    final_shortlist = bucket_1 + bucket_2
+
+    if args.debug_stage1:
+        with open("stage1_debug.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["candidate_id", "kscore", "has_core_skill_keyword", "in_shortlist"])
+            final_ids = {x[1]["candidate_id"] for x in final_shortlist}
+            for item in shortlist:
+                writer.writerow([item[1]["candidate_id"], item[0], item[3], item[1]["candidate_id"] in final_ids])
+
+    shortlist = final_shortlist
     print(f"Shortlisted top {len(shortlist)} for AI embedding", flush=True)
 
     stage1_time = time.time()
@@ -84,24 +148,26 @@ def main():
 
     # ---- Stage 2: AI embedding on shortlisted candidates only ----
     print("Stage 2: Loading AI model...", flush=True)
+    from embedding_engine import EmbeddingEngine
     engine = EmbeddingEngine()
     print("Model loaded. Encoding shortlisted candidates...", flush=True)
 
     texts = [item[2] for item in shortlist]
     candidates = [item[1] for item in shortlist]
 
-    batch_size = 512
+    batch_size = 1024
     all_scores = []
     for batch_start in range(0, len(texts), batch_size):
         batch_end = min(batch_start + batch_size, len(texts))
-        batch_texts = texts[batch_start:batch_end]
+        batch_texts = [t[:600] for t in texts[batch_start:batch_end]]
         batch_cands = candidates[batch_start:batch_end]
 
-        embeddings = engine.batch_encode(batch_texts)
+        embeddings = engine.batch_encode(batch_texts, batch_size=batch_size)
         semantic_scores = engine.compute_similarity(embeddings)
 
         for i, c in enumerate(batch_cands):
-            final_score, sem_s, sig_s = score_candidate(c, semantic_scores[i])
+            pen = get_penalty_reasons(c)
+            final_score, sem_s, sig_s, reason = score_candidate(c, semantic_scores[i], penalty_reasons=pen)
             all_scores.append({
                 "candidate_id": c["candidate_id"],
                 "score": final_score,
@@ -112,8 +178,8 @@ def main():
 
         print(f"  ... embedded {batch_end}/{len(texts)}", flush=True)
 
-    # Sort descending by score
-    all_scores.sort(key=lambda x: x["score"], reverse=True)
+    # Sort descending by score, ascending by candidate_id for tiebreak (submission spec)
+    all_scores.sort(key=lambda x: (-x["score"], x["candidate_id"]))
     top_100 = all_scores[:100]
 
     # Generate CSV
@@ -130,6 +196,7 @@ def main():
 
     end_time = time.time()
     print(f"Finished in {end_time - start_time:.1f}s (Stage 1: {stage1_time - start_time:.1f}s, Stage 2: {end_time - stage1_time:.1f}s)", flush=True)
+
 
 if __name__ == "__main__":
     main()

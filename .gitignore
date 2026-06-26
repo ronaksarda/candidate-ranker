@@ -9,7 +9,7 @@ local_model/
 # Input / Output Data
 *.jsonl
 *.jsonl.gz
-submission.csv
 *.json
 # Keep sample submission as reference
 !sample_submission.csv
+*.csv
