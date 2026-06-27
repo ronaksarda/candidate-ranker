@@ -49,8 +49,9 @@ def extract_evidence_sentence(candidate):
         desc = job.get("description", "").strip()
         if not desc:
             continue
-        m = _EVIDENCE_RE.search(desc)
-        if m:
+        matches = list(_EVIDENCE_RE.finditer(desc))
+        if matches:
+            m = max(matches, key=lambda match: len(match.group(0)))
             sent = m.group(0).strip()
             if len(sent) > 140:
                 sent = sent[:137] + "..."

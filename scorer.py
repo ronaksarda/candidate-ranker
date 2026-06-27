@@ -87,6 +87,7 @@ JD_CORE_SKILLS = {
     "hybrid retrieval",
     "bge",
     "openai embeddings",
+    "offline evaluation",
 }
 
 JD_STRONG_SKILLS = {
@@ -166,14 +167,20 @@ def calculate_title_multiplier(candidate):
 SERVICES_FIRMS = {
     "tcs", "tata consultancy services", "infosys", "wipro", "cognizant",
     "accenture", "capgemini", "hcl", "tech mahindra", "ibm", "l&t infotech",
-    "lti", "mindtree", "mphasis", "syntel", "genpact", "genpact ai"
+    "lti", "mindtree", "mphasis", "syntel", "genpact", "genpact ai",
+    "byju", "byjus", "byju's"
 }
 
+HEAVY_SERVICES_FIRMS = {
+    "genpact", "genpact ai", "wipro", "infosys", "tcs", "cognizant", 
+    "hcl", "accenture", "capgemini"
+}
 
 def calculate_services_penalty(candidate):
     """
     Graduated services penalty:
     100% services → 0.4x, >80% → 0.55x, >60% → 0.75x.
+    Heavy services get harsher penalties.
     """
     career_history = candidate.get("career_history", [])
     if not career_history:
@@ -181,28 +188,45 @@ def calculate_services_penalty(candidate):
 
     total_months = 0
     service_months = 0
+    heavy_service_months = 0
 
     for job in career_history:
         dur = job.get("duration_months", 0)
         total_months += dur
         company = job.get("company", "").lower()
         is_service = False
+        is_heavy = False
         for firm in SERVICES_FIRMS:
             if re.search(r'\b' + re.escape(firm) + r'\b', company):
                 is_service = True
                 break
-        if is_service:
+        for firm in HEAVY_SERVICES_FIRMS:
+            if re.search(r'\b' + re.escape(firm) + r'\b', company):
+                is_heavy = True
+                break
+        if is_heavy:
+            heavy_service_months += dur
+        elif is_service:
             service_months += dur
 
     if total_months == 0:
         return 1.0
 
-    ratio = service_months / total_months
-    if ratio >= 0.99:
-        return 0.4
-    if ratio > 0.80:
+    heavy_ratio = heavy_service_months / total_months
+    service_ratio = (service_months + heavy_service_months) / total_months
+    
+    if heavy_ratio >= 0.99:
+        return 0.25
+    if heavy_ratio > 0.80:
+        return 0.35
+    if heavy_ratio > 0.60:
         return 0.55
-    if ratio > 0.60:
+
+    if service_ratio >= 0.99:
+        return 0.4
+    if service_ratio > 0.80:
+        return 0.55
+    if service_ratio > 0.60:
         return 0.75
     return 1.0
 
@@ -279,7 +303,7 @@ def calculate_skill_match_score(candidate):
             elif sscore > 70:
                 assessment_bonus += 0.05
 
-    return min(1.0, base_score + min(0.2, assessment_bonus))
+    return min(1.0, base_score + min(0.2, assessment_bonus)), core_score
 
 
 def calculate_signal_score(candidate):
@@ -354,7 +378,7 @@ def calculate_signal_score(candidate):
         score += 0.02
 
     # P3: Soft availability gate for ghost candidates
-    if days_inactive > 90 and resp_rate < 0.25:
+    if days_inactive > 180 and resp_rate < 0.15:
         score *= 0.5
 
     score = min(1.0, score)
@@ -378,10 +402,12 @@ def calculate_experience_band_multiplier(candidate):
         return 0.72
     elif 9.0 < yoe <= 11.0:
         return 0.90
-    elif 3.0 <= yoe < 4.0 or 11.0 < yoe <= 14.0:
+    elif 3.0 <= yoe < 4.0:
+        return 0.55
+    elif 11.0 < yoe <= 14.0:
         return 0.75
     elif yoe < 3.0:
-        return 0.50
+        return 0.30
     else:
         return 0.60
 
@@ -482,7 +508,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
     Final scoring: fuses semantic similarity, explicit skill match,
     title relevance, experience band, and behavioral signals.
     """
-    skill_match = calculate_skill_match_score(candidate)
+    skill_match, core_skill_match_score = calculate_skill_match_score(candidate)
     signal_score = calculate_signal_score(candidate)
     title_mult = calculate_title_multiplier(candidate)
 
@@ -499,7 +525,10 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
     final_score *= calculate_experience_band_multiplier(candidate)
 
     # P5: Graduated services penalty
-    final_score *= calculate_services_penalty(candidate)
+    srv_mult = calculate_services_penalty(candidate)
+    if srv_mult < 1.0 and core_skill_match_score < 0.35:
+        srv_mult *= 0.85
+    final_score *= srv_mult
 
     # Title-chaser penalty
     career_history = candidate.get("career_history", [])
@@ -525,9 +554,9 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
 
     if not is_compatible and not will_relocate:
         if country and country != "india":
-            final_score *= 0.05
+            final_score *= 0.95
         else:
-            final_score *= 0.65
+            final_score *= 0.98
 
     last_active_str = signals.get("last_active_date")
     resp_rate = signals.get("recruiter_response_rate", 0.0)
@@ -540,13 +569,25 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         except ValueError:
             days_inactive = 180
 
-    if days_inactive > 180 and resp_rate < 0.1:
-        final_score *= 0.1
-    elif days_inactive > 180 or resp_rate < 0.1:
-        final_score *= 0.5
+    if days_inactive > 180 and resp_rate < 0.15:
+        final_score *= 0.7
 
     if not signals.get("open_to_work_flag", True):
-        final_score *= 0.1
+        final_score *= 0.9
+
+    # Compound unavailability penalty
+    unavailability_flags = 0
+    if not signals.get('open_to_work_flag', True):
+        unavailability_flags += 1
+    if days_inactive > 90:
+        unavailability_flags += 1
+    if resp_rate < 0.25:
+        unavailability_flags += 1
+
+    if unavailability_flags == 3:
+        final_score *= 0.45
+    elif unavailability_flags == 2:
+        final_score *= 0.70
 
     # Academic penalty
     final_score *= calculate_academic_penalty(candidate)

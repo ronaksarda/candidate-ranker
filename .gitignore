@@ -13,7 +13,13 @@ local_model/
 # Keep sample submission as reference
 !sample_submission.csv
 *.csv
+*.xlsx
+*.json
+signals.txt
 
 #sandbox
 *.ipynb
 generate_sandbox.py
+generate_notebook.py
+extract_top100.py
+

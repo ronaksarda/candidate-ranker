@@ -21,7 +21,7 @@ team_members:
 # ============================================================================
 github_repo: "https://github.com/ronaksarda/candidate-ranker"
 
-sandbox_link: "https://colab.research.google.com/drive/1nwazrKsOeoN1rb6XW9OTgTXwv2JiC94f?usp=sharing"
+sandbox_link: "https://colab.research.google.com/drive/12QxOBMdWSrwM0PTFGE7lzSqFFzpEndOb?usp=sharing"
 
 reproduce_command: "python main.py --candidates ./candidates.jsonl --out ./team_TeamClover.csv"
 
@@ -43,13 +43,15 @@ compute:
 # AI tools declaration
 # ============================================================================
 ai_tools_used:
-  - "Gemini (Antigravity IDE)"
+  - "Claude Sonnet 4.6 (Claude Desktop App)"
+  - "Gemini 3.1 Pro (Antigravity IDE)"
   - "Claude Opus 4.6 (Antigravity IDE)"
 
 ai_usage_summary: |
-  Used Gemini and Claude via Antigravity IDE for architecture discussion, code
-  scaffolding, and debugging. No candidate data was fed to any LLM during ranking.
+  Used Claude Sonnet 4.6 for architecture discussion and idea generation, while Gemini 3.1 Pro and Claude Opus 4.6 were used for 
+  code scaffolding and debugging. No candidate data was fed to any LLM during ranking.
   The ranking pipeline runs fully offline using local sentence-transformers models.
+  
 
 # ============================================================================
 # Approach summary

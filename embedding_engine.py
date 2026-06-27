@@ -28,22 +28,24 @@ class EmbeddingEngine:
 
         self.facets_text = {
             "core_ml": (
-                "Built and shipped embedding-based retrieval pipelines handling millions of queries. "
-                "Integrated sentence-transformers, BGE, and OpenAI embeddings into production search infrastructure. "
-                "Monitored NDCG and MRR in A/B tests to improve offline-to-online correlation. "
-                "Scaled hybrid retrieval architectures and managed index refresh and embedding drift."
+                "I have shipped embedding-based retrieval pipelines to real users at production scale. "
+                "I used NDCG, MRR, and MAP to measure quality and ran extensive A/B tests to compare retrieval architectures. "
+                "In production, I actively handled embedding drift, managed index refreshes, and built robust hybrid BM25+dense pipelines. "
+                "I utilized sentence-transformers, BGE, E5, and OpenAI embeddings for real-time semantic search. "
+                "I operated a cross-encoder reranker in production and rigorously designed offline-to-online evaluation correlations."
             ),
             "engineering_infra": (
-                "Deployed and maintained production vector databases like Pinecone, Weaviate, Qdrant, Milvus, and FAISS. "
-                "Wrote clean, production-grade Python for large-scale distributed systems. "
-                "Architected scalable infrastructure for candidate-JD matching and semantic search. "
-                "Managed latency, throughput, and index optimization for real-time retrieval."
+                "I have operated vector databases like Pinecone, Weaviate, Qdrant, Milvus, FAISS, and OpenSearch at production scale. "
+                "I systematically managed index latency, throughput, and system reliability for real-time serving of embedding models. "
+                "I built highly scalable candidate-JD and document retrieval infrastructure from scratch. "
+                "I write clean, production-grade Python to architect and deploy distributed ML systems. "
+                "I have deep operational experience dealing with ANN index tuning, including HNSW parameters, IVF, and quantization."
             ),
             "nice_to_haves": (
-                "Fine-tuned LLMs using LoRA, QLoRA, and PEFT for domain-specific tasks. "
-                "Trained learning-to-rank models using XGBoost and neural rankers. "
-                "Built marketplace products and talent intelligence features in the HR-tech space. "
-                "Contributed to open-source AI projects and mentored junior engineers on the team."
+                "I have hands-on experience fine-tuning LLMs using LoRA, QLoRA, and PEFT. "
+                "I trained and deployed learning-to-rank models utilizing XGBoost and neural rankers. "
+                "I have strong 0-to-1 product build experience, specifically within HR-tech and marketplace product domains. "
+                "I am an active contributor to open-source ML projects and have a proven track record of mentoring junior engineers."
             )
         }
 

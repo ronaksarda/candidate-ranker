@@ -84,6 +84,7 @@ def main():
     shortlist = []
     total = 0
     honeypots = 0
+    seen_fingerprints = set()
 
     for candidate in load_candidates_stream(args.candidates):
         total += 1
@@ -97,6 +98,13 @@ def main():
 
         text_profile = build_candidate_text(candidate)
         text_lower = text_profile.lower()
+        
+        fingerprint = hash(text_lower[:200])
+        if fingerprint in seen_fingerprints:
+            honeypots += 1
+            continue
+        seen_fingerprints.add(fingerprint)
+
         kscore = cheap_keyword_score(text_lower)
 
         if kscore > 0:
