@@ -357,7 +357,14 @@ def calculate_signal_score(candidate):
     if days_inactive > 90 and resp_rate < 0.25:
         score *= 0.5
 
-    return min(1.0, score)
+    score = min(1.0, score)
+
+    # Prevent junior candidates from being rescued solely by strong signal/location scores
+    yoe = profile.get("years_of_experience", 0)
+    if yoe < 5.0:
+        score *= 0.80
+
+    return score
 
 
 def calculate_experience_band_multiplier(candidate):
