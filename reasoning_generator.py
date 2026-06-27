@@ -1,3 +1,5 @@
+import random
+
 def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evidence_pair=None):
     from scorer import (
         TARGET_CITIES, JD_CORE_SKILLS_NORM, JD_STRONG_SKILLS_NORM,
@@ -7,6 +9,10 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
     profile = candidate.get("profile", {})
     title = profile.get("current_title", "Professional")
     cid = candidate.get("candidate_id", "Unknown")
+    
+    # Seed randomness so output is deterministic for a specific candidate ID, but heavily varied across candidates
+    random.seed(cid)
+    
     yoe = profile.get("years_of_experience", 0)
     signals = candidate.get("redrob_signals", {})
     career_history = candidate.get("career_history", [])
@@ -44,91 +50,103 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
     evidence = evidence_pair[0] if evidence_pair else None
     evidence_company = evidence_pair[1] if evidence_pair else None
 
-    # ---- Rank-aware reasoning generation ----
-    parts = []
+    company = ""
+    if career_history:
+        company = career_history[0].get("company", "")
 
-    # Lead: career identity
-    career_desc = f"{yoe:.1f}-year {title}"
-    if any(kw in career_text for kw in ["startup", "0 to 1", "0-to-1", "founding", "early stage"]):
-        career_desc += ", founding/startup background"
-    parts.append(career_desc)
+    # Gather skills text
+    skills_text = ""
+    if core_found_career:
+        skills_text = ", ".join(core_found_career[:3])
+    elif core_found_claimed:
+        skills_text = ", ".join(core_found_claimed[:3])
+    elif strong_found_career:
+        skills_text = ", ".join(strong_found_career[:3])
+    elif strong_found_claimed:
+        skills_text = ", ".join(strong_found_claimed[:3])
+    else:
+        skills_text = "generalist software engineering"
+
+    # Gather gaps
+    gaps = []
+    if notice > 60:
+        gaps.append(random.choice([f"a {notice}-day notice period", f"availability delayed by {notice} days", f"requires {notice} days notice"]))
+    if resp_rate < 0.4:
+        gaps.append(random.choice(["low recruiter responsiveness", "poor response rates", "historically unresponsive to outreach"]))
+    if not is_local and not will_relocate:
+        gaps.append(random.choice(["significant relocation risk", "not locally based and unwilling to move", "geo-mismatch"]))
+    if not core_found_career and rank > 50:
+        if yoe < 4:
+            gaps.append(random.choice(["needs more scale exposure", "insufficient production mileage"]))
+        elif strong_found_career:
+            gaps.append(random.choice(["missing dedicated retrieval background", "lacks core search-engine expertise"]))
+        else:
+            gaps.append(random.choice(["lacks core production ML evidence", "no verified production AI deployment"]))
+
+    # Gather strengths
+    strengths = []
+    if notice <= 30:
+        strengths.append(f"available in {notice} days")
+    if resp_rate > 0.6:
+        strengths.append(f"highly responsive ({int(resp_rate*100)}%)")
+    if gh_score > 60:
+        strengths.append(f"strong GitHub activity ({gh_score:.0f})")
+    if is_local:
+        strengths.append(f"based in {profile.get('location', 'target city')}")
+
+    # Start building the story based on templates!
+    structure = random.randint(1, 4)
+    story = ""
+
+    comp_str = f" at {company}" if company else ""
+    startup_str = " with a startup background" if any(kw in career_text for kw in ["startup", "0 to 1", "0-to-1", "founding", "early stage"]) else ""
 
     if rank <= 20:
-        # Top-20: lead with what makes them exceptional
-        if core_found_career:
-            parts.append(f"production experience with {', '.join(core_found_career[:3])}")
-        elif core_found_claimed:
-            parts.append(f"skilled in {', '.join(core_found_claimed[:3])}")
+        # Top-tier structures
+        if structure == 1:
+            story = f"Exceptional {yoe:.1f}-year {title}{comp_str}{startup_str}. Demonstrates clear production experience in {skills_text}."
+        elif structure == 2:
+            story = f"Top-tier candidate currently working as a {title}{comp_str} ({yoe:.1f} yrs). Stood out due to deep expertise in {skills_text}."
+        elif structure == 3:
+            story = f"A highly capable {title}{startup_str} bringing {yoe:.1f} years of experience, primarily focused on {skills_text}."
+        else:
+            story = f"With {yoe:.1f} years of tenure, this {title}{comp_str} shows outstanding command of {skills_text}."
             
-        if strong_found_career:
-            parts.append(f"deep {', '.join(strong_found_career[:2])} expertise")
-        elif strong_found_claimed:
-            parts.append(f"strong foundation in {', '.join(strong_found_claimed[:2])}")
+        if strengths:
+            story += " " + random.choice(["Additionally, they are ", "Bonus: ", "Further highlights: "]) + ", ".join(strengths) + "."
             
-        if evidence and evidence_company:
-            parts.append(f'at {evidence_company}: "{evidence}"')
-        elif evidence:
-            parts.append(f'"{evidence}"')
-
-        # Availability strength
-        if notice <= 30:
-            parts.append(f"available in {notice} days")
-        if resp_rate > 0.6:
-            parts.append(f"{int(resp_rate*100)}% response rate")
-        if gh_score > 60:
-            parts.append(f"GitHub activity {gh_score:.0f}")
-        if is_local:
-            parts.append(f"in {profile.get('location', '')}")
-        elif will_relocate:
-            parts.append("willing to relocate")
+        if evidence:
+            story += f" Evidence: \"{evidence}\""
 
     elif rank <= 50:
-        # Mid-tier: balanced view with honest gaps
-        if core_found_career:
-            parts.append(f"has {', '.join(core_found_career[:2])}")
-        elif core_found_claimed:
-            parts.append(f"knows {', '.join(core_found_claimed[:2])}")
-            
-        if strong_found_claimed:
-            parts.append(f"{', '.join(strong_found_claimed[:2])}")
-        if evidence and evidence_company:
-            parts.append(f'[{evidence_company}]: "{evidence}"')
+        # Mid-tier structures
+        if structure == 1:
+            story = f"Solid {yoe:.1f}-year {title}{comp_str}{startup_str} offering skills in {skills_text}."
+        elif structure == 2:
+            story = f"A viable {title} with {yoe:.1f} years under their belt, demonstrating capability in {skills_text}."
+        elif structure == 3:
+            story = f"Currently a {title}{comp_str}, bringing {yoe:.1f} years of experience and a foundation in {skills_text}."
+        else:
+            story = f"Brings {yoe:.1f} years of experience to the table as a {title}, showing competence with {skills_text}."
 
-        # Note gaps honestly
-        gaps = []
-        if notice > 60:
-            gaps.append(f"{notice}-day notice")
-        if resp_rate < 0.4:
-            gaps.append(f"low response ({int(resp_rate*100)}%)")
-        if not is_local and not will_relocate:
-            gaps.append("location mismatch")
         if gaps:
-            parts.append(f"concerns: {', '.join(gaps)}")
+            story += " " + random.choice(["However, consider: ", "Drawbacks include ", "Areas of concern: "]) + ", ".join(gaps) + "."
+            
+        if evidence and evidence_company:
+            story += f" Highlight at {evidence_company}: \"{evidence}\""
 
     else:
-        # Rank 51-100: lead with what they have
-        if strong_found_career:
-            parts.append(f"deep {', '.join(strong_found_career[:2])} expertise")
-        elif strong_found_claimed:
-            parts.append(f"familiar with {', '.join(strong_found_claimed[:2])}")
-        elif core_found_claimed:
-            parts.append(f"knows {', '.join(core_found_claimed[:2])}")
+        # Bottom-tier structures
+        if structure == 1:
+            story = f"This {yoe:.1f}-year {title}{comp_str} lists {skills_text}."
+        elif structure == 2:
+            story = f"While they have {yoe:.1f} years as a {title}, their profile mainly covers {skills_text}."
+        elif structure == 3:
+            story = f"A {title}{startup_str} ({yoe:.1f} yrs) whose primary exposure is {skills_text}."
         else:
-            parts.append("general ML background")
+            story = f"Evaluated as a {yoe:.1f}-year {title}{comp_str} familiar with {skills_text}."
 
-        gaps = []
-        if notice > 60:
-            gaps.append(f"{notice}-day notice")
-        if resp_rate < 0.3:
-            gaps.append(f"{int(resp_rate*100)}% response rate")
-        if not is_local and not will_relocate:
-            gaps.append("location mismatch")
-        if not core_found_career:
-            gaps.append("lacks core retrieval scale evidence")
         if gaps:
-            parts.append(f"gaps: {', '.join(gaps)}")
-        if evidence and evidence_company:
-            parts.append(f'but has evidence [{evidence_company}]: "{evidence}"')
+            story += " " + random.choice(["They were penalized for ", "Significant gaps: ", "Limitations: "]) + ", ".join(gaps) + "."
 
-    story = ", ".join(parts)
-    return f"Score {score:.3f}: {story}."
+    return f"Score {score:.3f}: {story}"
