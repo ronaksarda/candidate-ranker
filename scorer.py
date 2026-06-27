@@ -80,6 +80,9 @@ JD_CORE_SKILLS = {
     "a/b test",
     "a/b testing",
     "evaluation framework",
+    "eval framework",
+    "eval harness",
+    "evaluation harness",
     "hybrid search",
     "hybrid retrieval",
     "bge",
@@ -148,7 +151,7 @@ def calculate_title_multiplier(candidate):
     # JD is for "Senior AI Engineer — Founding Team": penalize junior titles
     for jt in JUNIOR_TITLE_KEYWORDS:
         if jt in title:
-            base_mult *= 0.70
+            base_mult *= 0.50
             break
 
     # Bonus for senior-level titles (founding team needs senior judgment)
@@ -365,7 +368,7 @@ def calculate_experience_band_multiplier(candidate):
     elif 5.0 <= yoe <= 9.0:
         return 1.0
     elif 4.0 <= yoe < 5.0:
-        return 0.82
+        return 0.72
     elif 9.0 < yoe <= 11.0:
         return 0.90
     elif 3.0 <= yoe < 4.0 or 11.0 < yoe <= 14.0:
@@ -440,6 +443,20 @@ def calculate_academic_penalty(candidate):
     return 1.0
 
 
+def calculate_infrastructure_penalty(candidate):
+    """Penalize pure MLOps/Infra engineers who lack ranking/retrieval signals."""
+    career_text = " ".join([job.get("description", "").lower() for job in candidate.get("career_history", [])])
+    infra_words = ["mlflow", "kubeflow", "orchestration", "pipeline", "infrastructure", "kubernetes", "docker"]
+    retrieval_words = ["retrieval", "ranking", "search", "embedding", "ndcg", "recsys", "recommendation", "vector"]
+    
+    has_infra = sum(1 for w in infra_words if w in career_text) >= 2
+    has_retrieval = any(w in career_text for w in retrieval_words)
+    
+    if has_infra and not has_retrieval:
+        return 0.7
+    return 1.0
+
+
 # Penalty multipliers for heuristic red flags from plausibility_filter
 PENALTY_MULTIPLIERS = {
     "duplicate_descriptions": 0.80,
@@ -503,7 +520,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         if country and country != "india":
             final_score *= 0.05
         else:
-            final_score *= 0.5
+            final_score *= 0.65
 
     last_active_str = signals.get("last_active_date")
     resp_rate = signals.get("recruiter_response_rate", 0.0)
@@ -526,6 +543,9 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
 
     # Academic penalty
     final_score *= calculate_academic_penalty(candidate)
+
+    # Infrastructure penalty
+    final_score *= calculate_infrastructure_penalty(candidate)
 
     # Apply heuristic penalties from plausibility_filter
     if penalty_reasons:

@@ -225,7 +225,7 @@ def main():
 
             for idx, item in enumerate(top_300):
                 norm_cross = (cross_scores[idx] - min_cross) / range_cross
-                item["score"] = item["score"] * 0.7 + norm_cross * 0.3
+                item["score"] = item["score"] * 0.6 + norm_cross * 0.4
 
             top_300.sort(key=lambda x: (-x["score"], x["candidate_id"]))
             top_100 = top_300[:100]
