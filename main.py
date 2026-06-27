@@ -218,9 +218,13 @@ def main():
 
             print("  Running Cross-Encoder prediction...", flush=True)
             cross_scores = cross_encoder.predict(cross_inp)
+            
+            min_cross = float(min(cross_scores))
+            max_cross = float(max(cross_scores))
+            range_cross = max_cross - min_cross if max_cross > min_cross else 1.0
 
             for idx, item in enumerate(top_300):
-                norm_cross = (cross_scores[idx] + 10) / 20.0
+                norm_cross = (cross_scores[idx] - min_cross) / range_cross
                 item["score"] = item["score"] * 0.7 + norm_cross * 0.3
 
             top_300.sort(key=lambda x: (-x["score"], x["candidate_id"]))

@@ -106,13 +106,15 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
             parts.append(f"concerns: {', '.join(gaps)}")
 
     else:
-        # Rank 51-100: lead with the gap that explains why they're here
-        if core_found_claimed:
-            parts.append(f"{', '.join(core_found_claimed[:2])}")
+        # Rank 51-100: lead with what they have
+        if strong_found_career:
+            parts.append(f"deep {', '.join(strong_found_career[:2])} expertise")
         elif strong_found_claimed:
-            parts.append(f"only {', '.join(strong_found_claimed[:2])}, no core retrieval skills")
+            parts.append(f"familiar with {', '.join(strong_found_claimed[:2])}")
+        elif core_found_claimed:
+            parts.append(f"knows {', '.join(core_found_claimed[:2])}")
         else:
-            parts.append("limited relevant skill overlap")
+            parts.append("general ML background")
 
         gaps = []
         if notice > 60:
@@ -122,7 +124,7 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
         if not is_local and not will_relocate:
             gaps.append("location mismatch")
         if not core_found_career:
-            gaps.append("no production evidence for vector DB/retrieval")
+            gaps.append("lacks core retrieval scale evidence")
         if gaps:
             parts.append(f"gaps: {', '.join(gaps)}")
         if evidence and evidence_company:

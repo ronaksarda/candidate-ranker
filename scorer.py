@@ -31,7 +31,6 @@ def normalize_text(text: str) -> str:
 
 TARGET_CITIES = {
     "pune", "noida", "delhi", "new delhi", "ncr", "mumbai", "hyderabad",
-    "bengaluru", "bangalore", "gurgaon", "gurugram",
 }
 
 # ============================================================================
@@ -118,7 +117,7 @@ def is_valid_match(jd_skill_norm, candidate_string_norm):
     pattern = JD_REGEX_PATTERNS.get(jd_skill_norm)
     if pattern and pattern.search(candidate_string_norm):
         return True
-    if candidate_string_norm and f" {candidate_string_norm} " in f" {jd_skill_norm} ":
+    if candidate_string_norm and f" {jd_skill_norm} " in f" {candidate_string_norm} ":
         return True
     return False
 
@@ -244,13 +243,23 @@ def calculate_skill_match_score(candidate):
     # Also check career descriptions for core skill evidence
     for jd_skill in JD_CORE_SKILLS_NORM:
         if is_valid_match(jd_skill, norm_career_text):
-            core_hits += 0.5
+            core_hits += 1.0
 
     core_score = min(1.0, core_hits / 3)
     strong_score = min(1.0, strong_hits / 3)
     nice_score = min(1.0, nice_hits / 2)
 
     base_score = (core_score * 0.50) + (strong_score * 0.35) + (nice_score * 0.15)
+
+    core_role_matches = 0
+    for job in candidate.get("career_history", []):
+        job_desc = job.get("description", "").lower()
+        norm_job_desc = normalize_text(job_desc)
+        if any(is_valid_match(jd_skill, norm_job_desc) for jd_skill in JD_CORE_SKILLS_NORM):
+            core_role_matches += 1
+
+    if core_role_matches >= 2:
+        base_score += 0.15
 
     skill_assessments = candidate.get("redrob_signals", {}).get("skill_assessment_scores", {})
     assessment_bonus = 0.0
@@ -355,7 +364,9 @@ def calculate_experience_band_multiplier(candidate):
         return 1.05  # Absolute sweet spot for Senior Founding Team
     elif 5.0 <= yoe <= 9.0:
         return 1.0
-    elif 4.0 <= yoe < 5.0 or 9.0 < yoe <= 11.0:
+    elif 4.0 <= yoe < 5.0:
+        return 0.82
+    elif 9.0 < yoe <= 11.0:
         return 0.90
     elif 3.0 <= yoe < 4.0 or 11.0 < yoe <= 14.0:
         return 0.75
@@ -401,8 +412,8 @@ def calculate_certification_bonus(candidate):
 
 
 DEPTH_EVIDENCE_PHRASES = [
-    "production", "deployed", "shipped", "a/b test", "offline eval",
-    "ndcg", "retrieval", "ranking", "recommendation system", "embedding"
+    "deployed", "shipped", "a/b test", "offline eval",
+    "ndcg", "recommendation system"
 ]
 
 
@@ -410,7 +421,7 @@ def calculate_depth_bonus(candidate):
     """Multiplicative bonus for candidates with deep production evidence."""
     career_text = " ".join([job.get("description", "").lower() for job in candidate.get("career_history", [])])
     hits = sum(1 for phrase in DEPTH_EVIDENCE_PHRASES if phrase in career_text)
-    if hits >= 3:
+    if hits >= 5:
         return 1.10
     return 1.0
 
@@ -492,7 +503,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         if country and country != "india":
             final_score *= 0.05
         else:
-            final_score *= 0.1
+            final_score *= 0.5
 
     last_active_str = signals.get("last_active_date")
     resp_rate = signals.get("recruiter_response_rate", 0.0)
