@@ -13,3 +13,7 @@ local_model/
 # Keep sample submission as reference
 !sample_submission.csv
 *.csv
+
+#sandbox
+*.ipynb
+generate_sandbox.py
