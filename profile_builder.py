@@ -10,8 +10,7 @@ _EVIDENCE_RE = re.compile(
 def build_candidate_text(candidate):
     """
     Dense text profile optimized for 600-char embedding window.
-    Front-loads: title + years, first sentence from top job, top 5 skills by duration.
-    Uses simple string split (no regex) for speed on 100k candidates.
+    Front-loads: title + years, first sentence from top 2 jobs, top 5 skills by duration.
     """
     profile = candidate.get("profile", {})
     title = profile.get("current_title", "")
@@ -19,14 +18,14 @@ def build_candidate_text(candidate):
 
     parts = [f"{yoe} years {title}"]
 
-    # First sentence of most recent job — fast, no regex
+    # First sentence of top 2 most recent jobs
     career = candidate.get("career_history", [])
-    if career:
-        desc = career[0].get("description", "").strip()
+    for job in career[:2]:
+        desc = job.get("description", "").strip()
         if desc:
             first = desc.split(".")[0].strip()
-            if len(first) > 120:
-                first = first[:117] + "..."
+            if len(first) > 100:
+                first = first[:97] + "..."
             parts.append(first + ".")
 
     # Top 5 skills by duration

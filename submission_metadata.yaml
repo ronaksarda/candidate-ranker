@@ -44,33 +44,36 @@ compute:
 # ============================================================================
 ai_tools_used:
   - "Gemini (Antigravity IDE)"
+  - "Claude Opus 4.6 (Antigravity IDE)"
 
 ai_usage_summary: |
-  Used Gemini via Antigravity IDE for architecture discussion, code scaffolding,
-  and debugging. No candidate data was fed to any LLM during ranking.
-  The ranking pipeline runs fully offline using a local sentence-transformers model.
+  Used Gemini and Claude via Antigravity IDE for architecture discussion, code
+  scaffolding, and debugging. No candidate data was fed to any LLM during ranking.
+  The ranking pipeline runs fully offline using local sentence-transformers models.
 
 # ============================================================================
 # Approach summary
 # ============================================================================
 methodology_summary: |
-  Semantic embedding ranker with behavioral signal fusion. Candidates are
-  streamed from JSONL via generator, passed through a plausibility filter
-  (4 mathematically impossible checks: extreme time-traveling tech, career overlap),
-  and then ranked by a fast deterministic keyword scan over all 100,000 profiles.
-  The top 3,500 candidates are shortlisted. We extract the most evidence-rich
-  sentence from their career history alongside their top 5 skills. This dense
-  text profile is batch-encoded using all-MiniLM-L6-v2 (loaded offline via
-  direct Transformers inference) against three JD facets written in candidate-voice
-  (core ML, search infra, nice-to-haves) to maximize cosine similarity alignment.
+  Three-stage neural retrieval pipeline with behavioral signal fusion.
+  Stage 1: Candidates are streamed from JSONL, passed through a plausibility
+  filter (4 mathematically impossible checks: expert-zero-months, YoE-exceeds-career,
+  overlapping career dates, time-traveling tech), then ranked by a fast deterministic
+  keyword scan with keyword-stuffer discount (core keywords in skills but absent
+  from career descriptions are halved). Top 3,500 shortlisted.
+  Stage 2: Dense text profiles (title + top 2 roles + top 5 skills, truncated to
+  600 chars) are batch-encoded using all-MiniLM-L6-v2 (loaded offline via direct
+  Transformers inference) against three JD facets (core ML, search infra, nice-to-haves).
   Final scoring combines semantic similarity (50%), explicit JD skill match (30%),
-  and behavioral signals (20%). It applies multiplicative gates: title matching,
-  5-9 year experience band, graduated services-firm penalty, tenure stability,
-  soft availability gates for ghost candidates, and explicitly penalizes LangChain-only
-  or pure CV profiles. A multiplicative depth bonus (1.10x) is applied at the end
-  to lift borderline candidates who demonstrate deep production evidence. Top 100
-  candidates receive evidence-grounded reasoning dynamically tailored to their rank
-  tier. Measured runtime on CPU: ~90 seconds, zero network calls.
+  and behavioral signals (20%). Multiplicative gates: title matching, 5-9 year
+  experience band, graduated services-firm penalty, tenure stability, location
+  compatibility, soft availability gates, and persona penalties (LangChain-only,
+  pure CV, hands-off architect, job-hopper).
+  Stage 3: Top 300 candidates are re-ranked by a local Cross-Encoder
+  (ms-marco-MiniLM-L-6-v2) for state-of-the-art contextual precision. Final
+  score blends Bi-Encoder (70%) and Cross-Encoder (30%). Evidence sentences are
+  deduplicated across candidates to prevent shared boilerplate.
+  Measured runtime on CPU: ~170 seconds, zero network calls.
 
 # ============================================================================
 # Declarations

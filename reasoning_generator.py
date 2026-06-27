@@ -1,9 +1,8 @@
-def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
+def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evidence_pair=None):
     from scorer import (
         TARGET_CITIES, JD_CORE_SKILLS_NORM, JD_STRONG_SKILLS_NORM,
         JD_NICE_SKILLS_NORM, normalize_text, is_valid_match
     )
-    import re
 
     profile = candidate.get("profile", {})
     title = profile.get("current_title", "Professional")
@@ -41,19 +40,9 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score):
     will_relocate = signals.get("willing_to_relocate", False)
     is_local = any(city in loc for city in TARGET_CITIES)
 
-    # Extract unique evidence from THIS candidate's career
-    evidence = None
-    evidence_company = None
-    for job in career_history:
-        desc = job.get("description", "")
-        m = re.search(r'[^.]*\b(\d+%|\d+ms|\d+k|shipped|deployed|production|reduced|improved|increased)\b[^.]*\.', desc, re.IGNORECASE)
-        if m:
-            snippet = m.group(0).strip()
-            if len(snippet) > 120:
-                snippet = snippet[:117].rsplit(" ", 1)[0] + "..."
-            evidence_company = job.get("company", "")
-            evidence = snippet
-            break
+    # Use pre-extracted, deduplicated evidence
+    evidence = evidence_pair[0] if evidence_pair else None
+    evidence_company = evidence_pair[1] if evidence_pair else None
 
     # ---- Rank-aware reasoning generation ----
     parts = []

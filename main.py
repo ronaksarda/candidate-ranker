@@ -9,7 +9,7 @@ from profile_builder import build_candidate_text
 from scorer import score_candidate
 from reasoning_generator import generate_reasoning
 
-# Disable all network access from sentence-transformers
+# Disable all network access to enforce strict offline execution
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_HUB_OFFLINE"] = "1"
 
@@ -101,7 +101,17 @@ def main():
 
         if kscore > 0:
             has_core = any(ck in text_lower for ck in CORE_KEYWORDS)
-            shortlist.append((kscore, candidate, text_profile[:1200], has_core))
+
+            # Discount keyword-stuffers: if core keywords appear in skills but
+            # not in career descriptions, halve the keyword score
+            career_desc_text = " ".join(
+                j.get("description", "").lower() for j in candidate.get("career_history", [])
+            )
+            core_in_career = any(ck in career_desc_text for ck in CORE_KEYWORDS)
+            if has_core and not core_in_career:
+                kscore = kscore // 2
+
+            shortlist.append((kscore, candidate, text_profile[:600], has_core))
 
     print(f"Stage 1 done: {total} scanned, {honeypots} honeypots, {len(shortlist)} have ML keywords", flush=True)
 
@@ -159,7 +169,7 @@ def main():
     all_scores = []
     for batch_start in range(0, len(texts), batch_size):
         batch_end = min(batch_start + batch_size, len(texts))
-        batch_texts = [t[:600] for t in texts[batch_start:batch_end]]
+        batch_texts = texts[batch_start:batch_end]
         batch_cands = candidates[batch_start:batch_end]
 
         embeddings = engine.batch_encode(batch_texts, batch_size=batch_size)
@@ -180,17 +190,66 @@ def main():
 
     # Sort descending by score, ascending by candidate_id for tiebreak (submission spec)
     all_scores.sort(key=lambda x: (-x["score"], x["candidate_id"]))
-    top_100 = all_scores[:100]
+    
+    # ---- Stage 3: Cross-Encoder Re-ranking on Top 300 ----
+    print("Stage 3: Cross-Encoder Re-ranking...", flush=True)
+    top_300 = all_scores[:300]
+    local_cross_path = os.path.join(os.path.dirname(__file__), "local_model", "ms-marco-MiniLM-L-6-v2")
 
-    # Generate CSV
+    if not os.path.isdir(local_cross_path):
+        print(f"  WARN: Cross-Encoder model not found at {local_cross_path}.", flush=True)
+        print("  Run 'python download_model.py' first. Falling back to Bi-Encoder ranking.", flush=True)
+        top_100 = all_scores[:100]
+    else:
+        try:
+            from sentence_transformers import CrossEncoder
+            cross_encoder = CrossEncoder(local_cross_path, max_length=512)
+
+            query = (
+                "Senior AI Engineer Founding Team Production Embeddings Vector Database "
+                "Python Evaluation Shipped Code A/B Test"
+            )
+            cross_inp = []
+            for item in top_300:
+                c = item["candidate"]
+                career_text = " ".join([j.get("description", "") for j in c.get("career_history", [])])
+                doc = c.get("profile", {}).get("summary", "") + " " + career_text
+                cross_inp.append([query, doc[:1500]])
+
+            print("  Running Cross-Encoder prediction...", flush=True)
+            cross_scores = cross_encoder.predict(cross_inp)
+
+            for idx, item in enumerate(top_300):
+                norm_cross = (cross_scores[idx] + 10) / 20.0
+                item["score"] = item["score"] * 0.7 + norm_cross * 0.3
+
+            top_300.sort(key=lambda x: (-x["score"], x["candidate_id"]))
+            top_100 = top_300[:100]
+            print("  Stage 3 complete.", flush=True)
+        except Exception as e:
+            print(f"  ERROR in Stage 3: {e}", flush=True)
+            print("  Falling back to Bi-Encoder ranking.", flush=True)
+            top_100 = all_scores[:100]
+
+    # Generate CSV with deduplicated evidence sentences
     print(f"Writing top 100 to {args.out}...", flush=True)
+    from profile_builder import extract_evidence_sentence
+    seen_evidence = set()
+
     with open(args.out, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(["candidate_id", "rank", "score", "reasoning"])
 
         for rank, item in enumerate(top_100, start=1):
+            evidence, company = extract_evidence_sentence(item["candidate"])
+            evidence_pair = None
+            if evidence and evidence not in seen_evidence:
+                seen_evidence.add(evidence)
+                evidence_pair = (evidence, company)
+
             reasoning = generate_reasoning(
-                item["candidate"], rank, item["score"], item["semantic"], item["signal"]
+                item["candidate"], rank, item["score"], item["semantic"], item["signal"],
+                evidence_pair=evidence_pair
             )
             writer.writerow([item["candidate_id"], rank, float(item["score"]), reasoning])
 

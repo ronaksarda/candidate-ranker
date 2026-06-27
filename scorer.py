@@ -31,7 +31,7 @@ def normalize_text(text: str) -> str:
 
 TARGET_CITIES = {
     "pune", "noida", "delhi", "new delhi", "ncr", "mumbai", "hyderabad",
-    "bengaluru", "bangalore", "gurgaon", "gurugram", "chennai", "kolkata"
+    "bengaluru", "bangalore", "gurgaon", "gurugram",
 }
 
 # ============================================================================
@@ -97,7 +97,8 @@ JD_STRONG_SKILLS = {
 
 JD_NICE_SKILLS = {
     "python", "docker", "kubernetes", "k8s", "aws", "mlops", "ci/cd",
-    "distributed systems", "microservices", "langchain", "llamaindex"
+    "distributed systems", "microservices", "langchain", "llamaindex",
+    "hr tech", "hr-tech", "recruiting", "marketplace"
 }
 
 JD_CORE_SKILLS_NORM = {normalize_text(s) for s in JD_CORE_SKILLS}
@@ -471,6 +472,13 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         durations = [j.get("duration_months", 0) for j in career_history]
         avg_tenure = sum(durations) / len(durations)
         if avg_tenure < 18:
+            final_score *= 0.6
+
+    # Hands-off architect penalty
+    title = candidate.get("profile", {}).get("current_title", "").lower()
+    if "architect" in title or "tech lead" in title:
+        career_text = " ".join([j.get("description", "").lower() for j in career_history])
+        if not any(w in career_text for w in ["code", "develop", "implement", "shipped", "python", "pytorch"]):
             final_score *= 0.6
 
     profile = candidate.get("profile", {})

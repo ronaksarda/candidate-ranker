@@ -22,13 +22,13 @@ def is_honeypot(candidate) -> tuple[bool, str | None]:
     if expert_zero >= 5:
         return True, "check_1_expert_zero_months"
 
-    # Check 3: Claimed YoE wildly exceeds career history
+    # Check 2: Claimed YoE wildly exceeds career history
     # Only kill if difference is extreme (>8 years unaccounted)
     total_career_months = sum(job.get("duration_months", 0) for job in career_history)
     if total_career_months > 0 and (yoe * 12) > (total_career_months + 96):
-        return True, "check_3_yoe_exceeds_career"
+        return True, "check_2_yoe_exceeds_career"
 
-    # Check 5: Overlapping dates — claiming 1.5x+ more duration than calendar time
+    # Check 3: Overlapping dates — claiming 1.5x+ more duration than calendar time
     if career_history:
         try:
             min_date = None
@@ -52,22 +52,22 @@ def is_honeypot(candidate) -> tuple[bool, str | None]:
             if min_date and max_date:
                 chronological_months = (max_date.year - min_date.year) * 12 + (max_date.month - min_date.month)
                 if chronological_months > 0 and total_career_months > (chronological_months * 2.0 + 36):
-                    return True, "check_5_overlapping_career_dates"
+                    return True, "check_3_overlapping_career_dates"
         except ValueError:
             pass
 
-    # Check 6: Time-traveling tech — claiming impossible duration for recent tech
+    # Check 4: Time-traveling tech — claiming impossible duration for recent tech
     for s in skills:
         name = s.get("name", "").lower()
         dur = s.get("duration_months", 0)
         if name == "qlora" and dur > 38:
-            return True, "check_6_time_traveling_tech"
+            return True, "check_4_time_traveling_tech"
         if name == "langchain" and dur > 50:
-            return True, "check_6_time_traveling_tech"
+            return True, "check_4_time_traveling_tech"
         if name == "chatgpt" and dur > 46:
-            return True, "check_6_time_traveling_tech"
+            return True, "check_4_time_traveling_tech"
         if name == "llama-2" and dur > 38:
-            return True, "check_6_time_traveling_tech"
+            return True, "check_4_time_traveling_tech"
 
     return False, None
 
