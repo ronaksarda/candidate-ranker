@@ -60,13 +60,15 @@ def is_honeypot(candidate) -> tuple[bool, str | None]:
     for s in skills:
         name = s.get("name", "").lower()
         dur = s.get("duration_months", 0)
-        if name == "qlora" and dur > 38:
+        if name == "qlora" and dur > 70:
             return True, "check_4_time_traveling_tech"
-        if name == "langchain" and dur > 50:
+        if name == "langchain" and dur > 70:
             return True, "check_4_time_traveling_tech"
-        if name == "chatgpt" and dur > 46:
+        if name == "chatgpt" and dur > 70:
             return True, "check_4_time_traveling_tech"
-        if name == "llama-2" and dur > 38:
+        if name == "llama-2" and dur > 70:
+            return True, "check_4_time_traveling_tech"
+        if name == "llamaindex" and dur > 70:
             return True, "check_4_time_traveling_tech"
 
     return False, None

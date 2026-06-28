@@ -18,7 +18,7 @@ def _extract_best_evidence(candidate):
             return sent, job.get("company", "")
     return None, None
 
-def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evidence_pair=None):
+def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evidence_pair=None, seen_evidence=None):
     from scorer import (
         TARGET_CITIES, JD_CORE_SKILLS_NORM, JD_STRONG_SKILLS_NORM,
         JD_NICE_SKILLS_NORM, normalize_text, is_valid_match
@@ -74,7 +74,17 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
     evidence_company = evidence_pair[1] if evidence_pair else None
 
     if not evidence and rank <= 50:
-        evidence, evidence_company = _extract_best_evidence(candidate)
+        ev, ev_company = _extract_best_evidence(candidate)
+        if ev:
+            if rank <= 20:
+                # Always show evidence for top 20, never block it
+                evidence = ev
+                evidence_company = ev_company
+            elif seen_evidence is None or ev not in seen_evidence:
+                evidence = ev
+                evidence_company = ev_company
+                if seen_evidence is not None:
+                    seen_evidence.add(ev)
 
     notice = signals.get("notice_period_days", 90)
     resp_rate = signals.get("recruiter_response_rate", 0.0)
@@ -150,11 +160,32 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
             
     else:
         has_skills = core_found_career or strong_found_career or core_found_claimed
-        if has_skills:
-            top = (core_found_career or core_found_claimed or strong_found_career)[:3]
+        top = (core_found_career or core_found_claimed or strong_found_career)[:3] if has_skills else []
+        
+        generic_skills = {"ranking", "a b test", "a b testing"}
+        if top and all(s.lower() in generic_skills for s in top):
+            top = []
+            has_skills = False
+
+        if has_skills and top:
             story = f"{identity} with {', '.join(top)}."
         else:
             story = f"{identity} with general ML background, limited retrieval overlap."
+            
+        ev_sent, _ = _extract_best_evidence(candidate)
+        if ev_sent and (seen_evidence is None or ev_sent not in seen_evidence):
+            story += f" Evidence: \"{ev_sent}\"."
+            if seen_evidence is not None:
+                seen_evidence.add(ev_sent)
+        else:
+            if career_history:
+                first_desc = career_history[0].get("description", "").strip()
+                if first_desc:
+                    first_sent = first_desc.split('.')[0].strip()
+                    if len(first_sent) > 110:
+                        first_sent = first_sent[:107] + "..."
+                    if first_sent:
+                        story += f" Career: \"{first_sent}\"."
             
         gaps = []
         if notice > 60:
@@ -166,9 +197,6 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
             
         if gaps:
             story += f" Notes: {', '.join(gaps)}."
-            
-        if evidence:
-            story += f" Evidence: \"{evidence}\"."
 
     # Output format exact match to prompt, removing trailing period from story if it exists to avoid '..'
     story_clean = story.rstrip('.')

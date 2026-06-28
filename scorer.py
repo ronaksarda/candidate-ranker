@@ -381,7 +381,7 @@ def calculate_signal_score(candidate):
 
     yoe = profile.get("years_of_experience", 0)
     # P3: Soft availability gate for ghost candidates
-    if days_inactive > 180 and resp_rate < 0.08 and yoe < 7:
+    if days_inactive > 180 and resp_rate < 0.08:
         score *= 0.5
 
     score = min(1.0, score)
@@ -572,25 +572,11 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
             days_inactive = 180
 
     yoe = profile.get("years_of_experience", 0)
-    if days_inactive > 180 and resp_rate < 0.08 and yoe < 7:
+    if days_inactive > 180 and resp_rate < 0.08:
         final_score *= 0.7
 
     if not signals.get("open_to_work_flag", True):
         final_score *= 0.9
-
-    # Compound unavailability penalty
-    unavailability_flags = 0
-    if not signals.get('open_to_work_flag', True):
-        unavailability_flags += 1
-    if days_inactive > 90:
-        unavailability_flags += 1
-    if resp_rate < 0.25:
-        unavailability_flags += 1
-
-    if unavailability_flags == 3:
-        final_score *= 0.45
-    elif unavailability_flags == 2:
-        final_score *= 0.70
 
     # Academic penalty
     final_score *= calculate_academic_penalty(candidate)
@@ -625,8 +611,5 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
 
     # P4: Apply depth bonus multiplicatively at the end
     final_score *= calculate_depth_bonus(candidate)
-
-    if core_hits_in_career_text < 2:
-        final_score *= 0.70
 
     return final_score, semantic_score, signal_score, None

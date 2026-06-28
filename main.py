@@ -1,4 +1,5 @@
 import sys
+sys.stderr = sys.stdout
 import os
 import time
 import argparse
@@ -84,6 +85,7 @@ def main():
     shortlist = []
     total = 0
     honeypots = 0
+    duplicates = 0
     seen_fingerprints = set()
 
     for candidate in load_candidates_stream(args.candidates):
@@ -101,7 +103,7 @@ def main():
         
         fingerprint = hash(text_lower[:200])
         if fingerprint in seen_fingerprints:
-            honeypots += 1
+            duplicates += 1
             continue
         seen_fingerprints.add(fingerprint)
 
@@ -121,7 +123,7 @@ def main():
 
             shortlist.append((kscore, candidate, text_profile[:600], has_core))
 
-    print(f"Stage 1 done: {total} scanned, {honeypots} honeypots, {len(shortlist)} have ML keywords", flush=True)
+    print(f"Stage 1 done: {total} scanned, {honeypots} honeypots, {duplicates} duplicates, {len(shortlist)} have ML keywords", flush=True)
 
     shortlist.sort(key=lambda x: x[0], reverse=True)
 
@@ -261,7 +263,7 @@ def main():
 
             reasoning = generate_reasoning(
                 item["candidate"], rank, item["score"], item["semantic"], item["signal"],
-                evidence_pair=evidence_pair
+                evidence_pair=evidence_pair, seen_evidence=seen_evidence
             )
             writer.writerow([item["candidate_id"], rank, float(item["score"]), reasoning])
 
