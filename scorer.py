@@ -378,7 +378,7 @@ def calculate_signal_score(candidate):
         score += 0.02
 
     # P3: Soft availability gate for ghost candidates
-    if days_inactive > 180 and resp_rate < 0.15:
+    if days_inactive > 180 and resp_rate < 0.08:
         score *= 0.5
 
     score = min(1.0, score)
@@ -399,7 +399,7 @@ def calculate_experience_band_multiplier(candidate):
     elif 5.0 <= yoe <= 9.0:
         return 1.0
     elif 4.0 <= yoe < 5.0:
-        return 0.72
+        return 0.78
     elif 9.0 < yoe <= 11.0:
         return 0.90
     elif 3.0 <= yoe < 4.0:
@@ -556,7 +556,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         if country and country != "india":
             final_score *= 0.95
         else:
-            final_score *= 0.98
+            final_score *= 0.75
 
     last_active_str = signals.get("last_active_date")
     resp_rate = signals.get("recruiter_response_rate", 0.0)
@@ -569,7 +569,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         except ValueError:
             days_inactive = 180
 
-    if days_inactive > 180 and resp_rate < 0.15:
+    if days_inactive > 180 and resp_rate < 0.08:
         final_score *= 0.7
 
     if not signals.get("open_to_work_flag", True):
