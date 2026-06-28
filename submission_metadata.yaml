@@ -21,7 +21,7 @@ team_members:
 # ============================================================================
 github_repo: "https://github.com/ronaksarda/candidate-ranker"
 
-sandbox_link: "https://colab.research.google.com/drive/12QxOBMdWSrwM0PTFGE7lzSqFFzpEndOb?usp=sharing"
+sandbox_link: "https://colab.research.google.com/drive/1zTgMyyQhbqnowZZ0kDDR0PaDfzlYIF0B?usp=sharing"
 
 reproduce_command: "python main.py --candidates ./candidates.jsonl --out ./team_TeamClover.csv"
 
