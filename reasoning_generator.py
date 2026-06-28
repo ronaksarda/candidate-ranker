@@ -73,7 +73,7 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
     evidence = evidence_pair[0] if evidence_pair else None
     evidence_company = evidence_pair[1] if evidence_pair else None
 
-    if not evidence and rank <= 30:
+    if not evidence and rank <= 50:
         evidence, evidence_company = _extract_best_evidence(candidate)
 
     notice = signals.get("notice_period_days", 90)
@@ -131,7 +131,7 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
             top = (core_found_career or core_found_claimed or strong_found_career)[:3]
             story += f" Key overlap: {', '.join(top)}."
             
-        if evidence and rank <= 30:
+        if evidence and rank <= 50:
             if evidence_company and company and evidence_company.lower() != company.lower():
                 story += f" Evidence (formerly at {evidence_company}): \"{evidence}\"."
             else:
