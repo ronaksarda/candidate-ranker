@@ -2,7 +2,7 @@ import re
 
 # Evidence-rich sentence detection — compiled once
 _EVIDENCE_RE = re.compile(
-    r'[^.]*\b(\d+%|\d+ms|\d+k|\d+x|shipped|deployed|built|production|reduced|improved|increased|launched|served|scale)\b[^.]*\.',
+    r'[^.]*(\b\d+%|\b\d+ms|\b\d+[kmb]\b|\b\d+x\b|\bshipped\b|\bdeployed\b|\breduced\b|\bimproved\b|\bincreased\b|\blatency\b|\bthroughput\b|\bprecision\b|\brecall\b|\bndcg\b|\bmrr\b)[^.]*\.',
     re.IGNORECASE
 )
 

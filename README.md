@@ -1,75 +1,92 @@
-# Team Clover - Candidate Ranking System 🍀
+# Intelligent Candidate Discovery & Ranking
+**Redrob Hackathon - Team Clover**
 
-A high-performance, strictly offline, Two-Stage Neural Retrieval pipeline designed to rank 100,000 synthetic software engineering candidates in under 3 minutes on a standard CPU. 
+An offline-first, highly optimized two-stage neural ranking architecture to evaluate 100,000 candidate profiles against a complex Job Description in under 3.5 minutes on CPU.
 
-This system was explicitly engineered to defeat keyword stuffing, time-traveling honeypots, and pure-academic wrappers, identifying the true "scrappy product-engineers" who have actually shipped production code.
+## Key Features
+- **Plausibility & Fraud Detection:** Instantly drops honeypots, keyword-stuffers, and "time-traveling" resumes (e.g., claiming 4 years in a 2-year-old framework).
+- **Two-Stage Neural Retrieval:** 
+  - *Stage 1 (Retrieval):* Blazing fast deterministic keyword filtering to reduce 100k candidates to a 3.5k shortlist.
+  - *Stage 2 (Scoring):* Local AI Bi-Encoder (`all-MiniLM-L6-v2`) computes dense vector similarity.
+  - *Stage 3 (Re-ranking):* State-of-the-Art Cross-Encoder (`ms-marco-MiniLM-L-6-v2`) performs deep contextual evaluation on the Top 300.
+- **Explainability:** Deterministic, regex-driven reasoning generator extracts mathematically verified quotes and metrics (e.g., *reduced p95 latency by 60%*) without LLM hallucinations.
+- **Behavioral Signal Fusion:** Integrates recruiter response rates, GitHub activity, and notice periods to prioritize high-intent, reachable candidates.
+- **Offline & Private:** Zero external API calls. Runs fully offline on standard CPU hardware.
 
-## 🚀 Quick Start (Running Offline)
+## Tech Stack
+- **Language**: Python 3.11
+- **ML/AI Models**: PyTorch, HuggingFace Transformers (SentenceTransformers)
+- **Data Processing**: Pandas, native JSON parsing, deterministic regex
+- **Platform/Environment**: Windows 11 / Any standard CPU environment
+- **Sandbox Environment**: Google Colab / Jupyter Notebooks
 
-The system is designed to run completely offline, satisfying strict privacy and hackathon execution constraints.
+## Prerequisites
+- Python 3.9+
+- ~16GB RAM for optimal batch processing
+- `candidates.jsonl` dataset in the appropriate directory
 
-### 1. Install Dependencies
+## Getting Started
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/ronaksarda/candidate-ranker.git
+cd candidate-ranker
+```
+
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
+*(Dependencies primarily include `torch`, `sentence-transformers`, `pandas`, and `jupyter`)*
 
-### 2. Download the Models (Run Once with Internet)
-Before going offline, cache the local neural networks (`all-MiniLM-L6-v2` and `ms-marco-MiniLM-L-6-v2`).
+### 3. Download Offline Models
+The system relies on heavily quantized, offline ML models. Run the download script to fetch them locally before disconnecting from the network:
 ```bash
 python download_model.py
 ```
-*Note: This saves the models to the `./local_model/` directory.*
 
-### 3. Run the Pipeline (Offline)
-You can now disconnect from the internet. The pipeline is hardcoded to block all HuggingFace network requests (`TRANSFORMERS_OFFLINE="1"`).
+### 4. Run the Pipeline
+To execute the end-to-end pipeline on the full dataset and generate the Top 100 ranked candidates CSV:
 ```bash
-python main.py --candidates "path/to/candidates.jsonl"
+python main.py --candidates ./candidates.jsonl --out ./team_TeamClover.csv
 ```
-The final Top 100 candidates will be written to `team_TeamClover.csv` in ~2.5 minutes.
 
----
-
-## 🧠 System Architecture (Two-Stage Neural Retrieval)
-
-Unlike traditional ATS systems that rely on keyword density or slow, hallucination-prone LLMs, this system utilizes a highly optimized 3-step funnel:
-
-### Stage 1: Plausibility & Keyword Filter (100k → 3.5k)
-*   **The Plausibility Filter (`plausibility_filter.py`)**: Runs chronological math checks to instantly destroy honeypots. If a candidate claims 4 years of experience in a 2-year-old framework (like Llama-2), or claims to be an "Expert" with 0 months of duration, they are permanently deleted.
-*   **The Fast Scan**: Drops candidates lacking basic ML terminology to save expensive AI compute.
-
-### Stage 2: Bi-Encoder Semantic Extraction (3.5k → 300)
-*   **The Model**: A local PyTorch instance of `all-MiniLM-L6-v2`.
-*   **The Logic (`scorer.py`)**: The Bi-Encoder calculates the dense vector similarity between the candidate's career and the JD. This base score is then multiplied by **Persona Gates**. We mathematically penalize job-hoppers (tenure < 18m), hands-off architects, and consulting-only careers, while boosting candidates in the exact 5-9 year experience band.
-
-### Stage 3: Cross-Encoder Re-Ranking (300 → 100)
-*   **The Model**: A local instance of `cross-encoder/ms-marco-MiniLM-L-6-v2`.
-*   **The Logic**: The Top 300 candidates are passed to the Cross-Encoder, which simultaneously analyzes the JD and the candidate's career history word-by-word. This cross-attention mechanism provides State-of-the-Art contextual precision, finalizing the exact Top 100 ranking.
-
----
-
-## 🛡️ Differentiators & Defense
-
-### 1. Preventing Hallucinations
-We do not use Generative AI (like ChatGPT) to summarize candidates. The justifications in the output CSV are generated deterministically by `reasoning_generator.py`. The engine uses strict Regex to extract mathematically verified quotes (e.g., *"reduced latency by 60%"*) directly from the candidate's raw text. **If they didn't write it, the system cannot output it.**
-
-### 2. Defeating the "LangChain Wrapper"
-The JD explicitly disqualifies developers whose only AI experience is wrapping APIs in the last 12 months. Our system mathematically slashes scores for candidates who list "LangChain" but lack foundational ML skills (PyTorch, Scikit-learn, etc.), ensuring only true engineers rise to the top.
-
-### 3. The "Vibe" Check (Behavioral Reality)
-A perfect resume is useless if the candidate won't reply. The final score directly integrates live behavioral signals. "Ghosts" (candidates with terrible recruiter response rates, high notice periods, or inactive logins) are aggressively downranked to save recruiter time.
-
----
-
-## 🛠️ File Structure
-
-```text
-Candidate_Ranking_Submission/
-├── main.py                     # Orchestrator & Two-Stage Pipeline
-├── scorer.py                   # Business logic, multipliers, and persona gates
-├── plausibility_filter.py      # Hard rules and honeypot detection
-├── embedding_engine.py         # PyTorch inference for Bi-Encoder vectors
-├── reasoning_generator.py      # Regex-driven deterministic justification writer
-├── download_model.py           # Pre-caches models for offline execution
-├── local_model/                # Cached weights for offline inference
-└── README.md                   # Documentation
+### 5. Jupyter Sandbox (Test Environment)
+To run the ranker on a smaller test sample (`test.jsonl`), use the generated notebook:
+```bash
+jupyter notebook submission.ipynb
 ```
+Or view the hosted Colab sandbox linked in our submission metadata.
+
+## Architecture
+
+### Directory Structure
+```
+├── main.py                  # Orchestrator & Fast Pre-filter
+├── plausibility_filter.py   # "Hard Rules" fraud and honeypot detection
+├── embedding_engine.py      # Local PyTorch inference (Bi-Encoder)
+├── scorer.py                # Vibe Engine (business logic, behavioral gates)
+├── reasoning_generator.py   # Regex-driven hallucination-free report writer
+├── download_model.py        # Utility to fetch models for offline use
+├── generate_notebook.py     # Script to package the pipeline into an .ipynb
+├── extract_top100.py        # Utility to generate final submission JSON/CSV
+├── submission.ipynb         # Hosted Sandbox Notebook (Generated)
+└── submission_metadata.yaml # Hackathon submission details
+```
+
+### End-to-End Workflow
+
+1. **Ingestion & Plausibility Filter (100k → ~99.5k)**: `plausibility_filter.py` deletes honeypots and mathematically impossible timelines.
+2. **Fast Keyword Pre-Filter (~99.5k → 3.5k)**: `main.py` performs a deterministic scan to drop candidates lacking basic ML terminology.
+3. **Bi-Encoder Semantic Extraction**: `embedding_engine.py` encodes the 3,500 candidates into dense vectors and scores them.
+4. **Business Logic Scoring (3.5k → 300)**: `scorer.py` fuses semantic scores with behavioral signals and persona gates (e.g., job-hopper penalties).
+5. **Cross-Encoder Re-Ranking (Top 300 → Top 100)**: The `ms-marco-MiniLM-L-6-v2` cross-encoder scrutinizes exact contextual overlap.
+6. **Reasoning Generation**: `reasoning_generator.py` extracts raw metrics directly from candidate descriptions to write a comprehensive, evidence-grounded justification.
+
+## System Performance
+- **Runtime:** ~205 seconds (3.4 minutes) on an 8-core CPU.
+- **Accuracy:** Zero false-positives on keyword traps (LangChain wrappers, pure academics).
+- **Scale:** Processes 100,000 JSON candidates without massive cloud compute costs.
+
+---
+*Built for the Redrob Hackathon: India Runs on Data and AI Challenge.*

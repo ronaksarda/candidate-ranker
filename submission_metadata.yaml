@@ -73,9 +73,9 @@ methodology_summary: |
   pure CV, hands-off architect, job-hopper).
   Stage 3: Top 300 candidates are re-ranked by a local Cross-Encoder
   (ms-marco-MiniLM-L-6-v2) for state-of-the-art contextual precision. Final
-  score blends Bi-Encoder (70%) and Cross-Encoder (30%). Evidence sentences are
-  deduplicated across candidates to prevent shared boilerplate.
-  Measured runtime on CPU: ~170 seconds, zero network calls.
+  score blends Bi-Encoder (60%) and Cross-Encoder (40%). Evidence sentences are
+  extracted, filtering out boilerplate, and deduplicated across candidates.
+  Measured runtime on CPU: ~205 seconds (3.4 minutes), zero network calls.
 
 # ============================================================================
 # Declarations
