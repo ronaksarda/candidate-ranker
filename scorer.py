@@ -267,10 +267,12 @@ def calculate_skill_match_score(candidate):
                 nice_hits += 1
                 break
 
+    core_hits_in_career_text = 0
     # Also check career descriptions for core skill evidence
     for jd_skill in JD_CORE_SKILLS_NORM:
         if is_valid_match(jd_skill, norm_career_text):
             core_hits += 1.0
+            core_hits_in_career_text += 1
 
     core_score = min(1.0, core_hits / 3)
     strong_score = min(1.0, strong_hits / 3)
@@ -303,7 +305,7 @@ def calculate_skill_match_score(candidate):
             elif sscore > 70:
                 assessment_bonus += 0.05
 
-    return min(1.0, base_score + min(0.2, assessment_bonus)), core_score
+    return min(1.0, base_score + min(0.2, assessment_bonus)), core_score, core_hits_in_career_text
 
 
 def calculate_signal_score(candidate):
@@ -377,14 +379,14 @@ def calculate_signal_score(candidate):
     elif avg_resp_time and avg_resp_time < 24:
         score += 0.02
 
+    yoe = profile.get("years_of_experience", 0)
     # P3: Soft availability gate for ghost candidates
-    if days_inactive > 180 and resp_rate < 0.08:
+    if days_inactive > 180 and resp_rate < 0.08 and yoe < 7:
         score *= 0.5
 
     score = min(1.0, score)
 
     # Prevent junior candidates from being rescued solely by strong signal/location scores
-    yoe = profile.get("years_of_experience", 0)
     if yoe < 5.0:
         score *= 0.80
 
@@ -508,7 +510,7 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
     Final scoring: fuses semantic similarity, explicit skill match,
     title relevance, experience band, and behavioral signals.
     """
-    skill_match, core_skill_match_score = calculate_skill_match_score(candidate)
+    skill_match, core_skill_match_score, core_hits_in_career_text = calculate_skill_match_score(candidate)
     signal_score = calculate_signal_score(candidate)
     title_mult = calculate_title_multiplier(candidate)
 
@@ -569,7 +571,8 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
         except ValueError:
             days_inactive = 180
 
-    if days_inactive > 180 and resp_rate < 0.08:
+    yoe = profile.get("years_of_experience", 0)
+    if days_inactive > 180 and resp_rate < 0.08 and yoe < 7:
         final_score *= 0.7
 
     if not signals.get("open_to_work_flag", True):
@@ -603,7 +606,6 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
 
     # Closed source penalty
     gh_score = signals.get("github_activity_score", -1)
-    yoe = profile.get("years_of_experience", 0)
     career_text = " ".join([job.get("description", "").lower() for job in career_history])
     if gh_score == 0 and yoe >= 8 and "open source" not in career_text:
         final_score *= 0.85
@@ -623,5 +625,8 @@ def score_candidate(candidate, semantic_score, penalty_reasons=None):
 
     # P4: Apply depth bonus multiplicatively at the end
     final_score *= calculate_depth_bonus(candidate)
+
+    if core_hits_in_career_text < 2:
+        final_score *= 0.70
 
     return final_score, semantic_score, signal_score, None

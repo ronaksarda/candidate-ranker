@@ -1,5 +1,23 @@
 import re
 
+_EVIDENCE_RE = re.compile(
+    r'[^.]*\b(\d+%|\d+ms|\d+k|\d+x|shipped|deployed|built|production|reduced|improved|increased|launched|served|scale)\b[^.]*\.',
+    re.IGNORECASE
+)
+
+def _extract_best_evidence(candidate):
+    for job in candidate.get("career_history", [])[:3]:
+        desc = job.get("description", "").strip()
+        if not desc:
+            continue
+        m = _EVIDENCE_RE.search(desc)
+        if m:
+            sent = m.group(0).strip()
+            if len(sent) > 140:
+                sent = sent[:137] + "..."
+            return sent, job.get("company", "")
+    return None, None
+
 def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evidence_pair=None):
     from scorer import (
         TARGET_CITIES, JD_CORE_SKILLS_NORM, JD_STRONG_SKILLS_NORM,
@@ -39,8 +57,24 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
     strong_found_career = find_hits(JD_STRONG_SKILLS_NORM, require_in_career=True)
     strong_found_claimed = find_hits(JD_STRONG_SKILLS_NORM, require_in_career=False)
 
+    if len(core_found_career) == 1 and core_found_career[0] == "ranking":
+        if strong_found_career:
+            core_found_career = strong_found_career
+        elif strong_found_claimed:
+            core_found_career = strong_found_claimed
+        else:
+            if career_history:
+                first_desc = career_history[0].get("description", "")
+                if first_desc:
+                    first_sent = first_desc.split('.')[0][:100].strip()
+                    if first_sent:
+                        core_found_career = [f'"{first_sent}..."']
+
     evidence = evidence_pair[0] if evidence_pair else None
     evidence_company = evidence_pair[1] if evidence_pair else None
+
+    if not evidence and rank <= 30:
+        evidence, evidence_company = _extract_best_evidence(candidate)
 
     notice = signals.get("notice_period_days", 90)
     resp_rate = signals.get("recruiter_response_rate", 0.0)
@@ -96,6 +130,12 @@ def generate_reasoning(candidate, rank, score, semantic_score, signal_score, evi
         if has_skills:
             top = (core_found_career or core_found_claimed or strong_found_career)[:3]
             story += f" Key overlap: {', '.join(top)}."
+            
+        if evidence and rank <= 30:
+            if evidence_company and company and evidence_company.lower() != company.lower():
+                story += f" Evidence (formerly at {evidence_company}): \"{evidence}\"."
+            else:
+                story += f" Evidence: \"{evidence}\"."
             
         gaps = []
         if notice > 60:
